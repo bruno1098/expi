@@ -16,17 +16,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-export default async function handler(req, res) {
-  // Adiciona cabeçalhos de CORS
+export const allowCors = (fn) => async (req, res) => {
+  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
-    // Responde a requisições OPTIONS rapidamente
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
+  return await fn(req, res);
+};
+
+const handler = async (req, res) => {
   if (req.method === 'POST') {
     // Lógica para salvar feedback no Firebase
     const { id, usuario, comentario, rating, data } = req.body;
@@ -50,7 +54,7 @@ export default async function handler(req, res) {
     try {
       const dbRef = ref(database);
       const snapshot = await get(child(dbRef, `feedback`));
-      
+
       if (snapshot.exists()) {
         res.status(200).json(snapshot.val());
       } else {
@@ -63,4 +67,7 @@ export default async function handler(req, res) {
   } else {
     res.status(405).json({ message: 'Método não permitido' });
   }
-}
+};
+
+// Exportando a função handler com CORS habilitado
+export default allowCors(handler);
