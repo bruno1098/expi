@@ -38,7 +38,6 @@ export function Chat() {
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
 const [errorMessage, setErrorMessage] = useState("");
 
-
 const client = axios.create({
   baseURL: "https://api.openai.com/v1",
   headers: {
@@ -217,13 +216,13 @@ const client = axios.create({
   };
 
   const [currentId, setCurrentId] = useState(1);
-
-const handleOpenFeedbackModal = async () => {
+  const handleOpenFeedbackModal = async () => {
     if (messages.length === 0) {
         setErrorMessage("A conversa deve ter pelo menos uma mensagem antes de ser finalizada.");
         setIsErrorModalOpen(true);
         return;
     }
+
     const conversationText = messages.map(msg => {
         const role = msg.role === "user" ? "Usuário" : "Chatbot";
         return `${role}: ${msg.content}`;
@@ -286,15 +285,17 @@ const handleOpenFeedbackModal = async () => {
         setModalTitle(modalTitle);
         setTitleColor(titleColor);
 
-        // Ajuste aqui
+        // Preparar o feedback para salvar via API
         const feedbackData = {
-          id: currentId,// Incrementa o ID a cada chamada
-            usuario: "admin", // Pode mudar futuramente para o usuário autenticado
-            comentario: analysis,
-            rating: categoryResult,
-            data: new Date().toISOString(), // Adiciona a data atual no formato ISO
+          id: currentId, // Incrementa o ID a cada chamada
+          usuario: "admin", // Pode mudar futuramente para o usuário autenticado
+          comentario: analysis,
+          rating: categoryResult,
+          data: new Date().toISOString(), // Adiciona a data atual no formato ISO
         };
         setCurrentId(currentId + 1);
+
+        // Enviar o feedback para a API (que irá salvar no Firebase)
         const apiResponse = await axios.post("/api/feedback", feedbackData, {
             headers: {
                 'Content-Type': 'application/json'

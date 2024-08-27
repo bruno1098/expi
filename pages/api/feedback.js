@@ -1,51 +1,58 @@
-import fs from 'fs';
-import path from 'path';
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, set, get, child } from "firebase/database";
 
-export default function handler(req, res) {
-  const feedbackFilePath = path.join(process.cwd(), 'data', 'feedback.json');
+// Configurações do Firebase com suas credenciais
+// Configurações do Firebase com suas credenciais utilizando variáveis de ambiente
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+};
 
+
+// Inicializa o Firebase
+const app = initializeApp(firebaseConfig);
+const database = getDatabase(app);
+
+export default async function handler(req, res) {
   if (req.method === 'POST') {
-    // Certifique-se de que a pasta 'data' existe
-    if (!fs.existsSync(path.dirname(feedbackFilePath))) {
-      fs.mkdirSync(path.dirname(feedbackFilePath), { recursive: true });
+    // Lógica para salvar feedback no Firebase
+    const { id, usuario, comentario, rating, data } = req.body;
+
+    try {
+      const feedbackRef = ref(database, `feedback/${id}`);
+      await set(feedbackRef, {
+        id,
+        usuario,
+        comentario,
+        rating,
+        data,
+      });
+      res.status(200).json({ message: 'Feedback salvo com sucesso!' });
+    } catch (err) {
+      console.error('Erro ao salvar feedback:', err);
+      res.status(500).json({ error: 'Erro ao salvar feedback' });
     }
-
-    // Lendo feedbacks existentes (se houver)
-    let feedbacks = [];
-    if (fs.existsSync(feedbackFilePath)) {
-      const fileContents = fs.readFileSync(feedbackFilePath);
-      feedbacks = JSON.parse(fileContents);
-    }
-
-    // Adicionando o novo feedback ao array
-    const newFeedback = req.body;
-    feedbacks.push(newFeedback);
-
-    // Salvando o feedback no arquivo
-    fs.writeFileSync(feedbackFilePath, JSON.stringify(feedbacks, null, 2));
-
-    // Respondendo com sucesso
-    res.status(200).json({ message: 'Feedback salvo com sucesso!' });
-
   } else if (req.method === 'GET') {
-    // Se for uma requisição GET, retornamos todos os feedbacks
-    if (fs.existsSync(feedbackFilePath)) {
-      const fileContents = fs.readFileSync(feedbackFilePath);
-      const feedbacks = JSON.parse(fileContents);
-      res.status(200).json(feedbacks);
-    } else {
-      res.status(200).json([]); // Retorna um array vazio se não houver feedbacks
-    }
-  } else if (req.method === 'DELETE') {
-    // Se for uma requisição DELETE, deletamos o arquivo de feedbacks
-    if (fs.existsSync(feedbackFilePath)) {
-      fs.unlinkSync(feedbackFilePath);  // Deleta o arquivo
-      res.status(200).json({ message: 'Arquivo de feedback deletado com sucesso!' });
-    } else {
-      res.status(404).json({ message: 'Arquivo não encontrado.' });
+    // Lógica para recuperar feedback do Firebase
+    try {
+      const dbRef = ref(database);
+      const snapshot = await get(child(dbRef, `feedback`));
+      
+      if (snapshot.exists()) {
+        res.status(200).json(snapshot.val());
+      } else {
+        res.status(404).json({ message: 'Nenhum feedback encontrado' });
+      }
+    } catch (err) {
+      console.error('Erro ao recuperar feedback:', err);
+      res.status(500).json({ error: 'Erro ao recuperar feedback' });
     }
   } else {
-    // Se o método não for POST, GET ou DELETE, retornamos 405 (Método não permitido)
     res.status(405).json({ message: 'Método não permitido' });
   }
 }
