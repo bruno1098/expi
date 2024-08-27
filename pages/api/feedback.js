@@ -2,7 +2,6 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
 
 // Configurações do Firebase com suas credenciais
-// Configurações do Firebase com suas credenciais utilizando variáveis de ambiente
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -13,12 +12,21 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 export default async function handler(req, res) {
+  // Adiciona cabeçalhos de CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    // Responde a requisições OPTIONS rapidamente
+    return res.status(200).end();
+  }
+
   if (req.method === 'POST') {
     // Lógica para salvar feedback no Firebase
     const { id, usuario, comentario, rating, data } = req.body;
