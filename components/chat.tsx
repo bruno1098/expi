@@ -238,19 +238,28 @@ const handleDeleteConversation = async (index: number) => {
     updatedHistory.splice(index, 1);
     setHistory(updatedHistory);
 
-    // Verifica se a conversa que foi excluída era a ativa, se sim, inicia uma nova conversa
+    // Atualizar o localStorage após a exclusão
+    localStorage.setItem("chatHistory", JSON.stringify(updatedHistory));
+
+    // Verifica se a conversa que foi excluída era a ativa
     if (activeConversationIndex !== null) {
       if (activeConversationIndex === index) {
+        // Se a conversa ativa foi excluída, inicia uma nova conversa
         handleNewConversation();
       } else if (activeConversationIndex > index) {
+        // Se a conversa ativa estava após a excluída, ajusta o índice
         setActiveConversationIndex(activeConversationIndex - 1);
       }
     }
   } catch (error) {
     console.error("Erro ao excluir conversa no Firebase:", error);
     // Exibir uma mensagem de erro ao usuário
+    setErrorMessage("Erro ao excluir conversa. Tente novamente.");
+    setIsErrorModalOpen(true);
   }
 };
+
+
 
 const handleNewConversation = () => {
   setMessages([]);
