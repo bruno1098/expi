@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, get, child } from "firebase/database";
+import { getDatabase, ref, set, get, remove, runTransaction } from "firebase/database";
 
 // Configurações do Firebase com suas credenciais
 const firebaseConfig = {
@@ -29,6 +29,49 @@ export const allowCors = (fn) => async (req, res) => {
 
   return await fn(req, res);
 };
+
+export const getNextFeedbackId = async () => {
+  const idRef = ref(database, 'feedbackCounter/id');
+  
+  const nextId = await runTransaction(idRef, (currentId) => {
+    return (currentId || 0) + 1;
+  });
+
+  return nextId.snapshot.val();
+};
+
+export const getNextConversationId = async () => {
+  const idRef = ref(database, 'conversationCounter/id');
+
+  const nextId = await runTransaction(idRef, (currentId) => {
+    return (currentId || 0) + 1;
+  });
+
+  return nextId.snapshot.val();
+};
+
+// Função para salvar uma conversa no Firebase
+export const saveConversationToFirebase = async (conversationId, conversationData) => {
+  try {
+    const conversationRef = ref(database, `conversations/${conversationId}`);
+    await set(conversationRef, conversationData);
+    console.log("Conversa salva com sucesso!");
+  } catch (error) {
+    console.error("Erro ao salvar conversa no Firebase:", error);
+  }
+};
+
+export const deleteConversationFromFirebase = async (conversationId) => {
+  try {
+    const conversationRef = ref(database, `conversations/${conversationId}`);
+    await remove(conversationRef); // Certifica-se de que a conversa foi removida
+    console.log("Conversa excluída com sucesso do Firebase!");
+  } catch (error) {
+    console.error("Erro ao excluir conversa no Firebase:", error);
+    throw error; // Re-lança o erro para que ele possa ser tratado corretamente
+  }
+};
+
 
 const handler = async (req, res) => {
   if (req.method === 'POST') {
@@ -71,3 +114,5 @@ const handler = async (req, res) => {
 
 // Exportando a função handler com CORS habilitado
 export default allowCors(handler);
+
+export { database }; // Exportando o database para ser usado em outros arquivos
