@@ -346,7 +346,7 @@ const handleOpenFeedbackModal = async () => {
     // Preparar o feedback para salvar via API
     const feedbackData = {
       id: feedbackId,
-      usuario: "admin",
+      usuario: "Rafael Lino",
       comentario: analysis,
       rating: categoryResult,
       data: new Date().toISOString(),
