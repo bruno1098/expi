@@ -13,16 +13,22 @@ const Canais = () => {
 
   const handleAnswer = useCallback(async (answer) => {
     if (peerConnection.current) {
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
-      while (iceCandidateQueue.current.length > 0) {
-        const candidate = iceCandidateQueue.current.shift();
-        if (candidate) {
-          await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+      if (peerConnection.current.signalingState === "have-local-offer") {
+        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+        
+        // Agora que a remoteDescription foi definida, processar a fila de candidatos
+        while (iceCandidateQueue.current.length > 0) {
+          const candidate = iceCandidateQueue.current.shift();
+          if (candidate) {
+            await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+          }
         }
+      } else {
+        console.log(`Estado de sinalização não permite setRemoteDescription: ${peerConnection.current.signalingState}`);
       }
     }
   }, []);
-
+  
   const handleICECandidate = useCallback(async (candidate) => {
     if (candidate) {
       if (peerConnection.current && peerConnection.current.remoteDescription && peerConnection.current.remoteDescription.type !== '') {
