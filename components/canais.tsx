@@ -15,45 +15,60 @@ const Canais = () => {
     if (!peerConnection.current) {
       await createPeerConnection();
     }
-
-    await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(offer));
-
-    const answer = await peerConnection.current?.createAnswer();
-    await peerConnection.current?.setLocalDescription(answer);
-
-    socket.current?.send(JSON.stringify({
-      type: 'answer',
-      answer
-    }));
-  }, []);
-
-  // Função para lidar com respostas WebRTC recebidas
-  const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {
-    await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(answer));
-  }, []);
-
-  // Função para lidar com candidatos ICE recebidos
-  const handleICECandidate = useCallback(async (candidate: RTCIceCandidateInit | undefined) => {
-    if (candidate) {
-      await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
+  
+    if (peerConnection.current) {
+      // Verificar se o estado do peerConnection está "stable"
+      if (peerConnection.current.signalingState !== "stable") {
+        console.log('O estado de sinalização não está estável. Estado atual: ', peerConnection.current.signalingState);
+        return;
+      }
+  
+      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+  
+      const answer = await peerConnection.current.createAnswer();
+      await peerConnection.current.setLocalDescription(answer);
+  
+      socket.current?.send(JSON.stringify({
+        type: 'answer',
+        answer
+      }));
     }
   }, []);
+  
+  const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {
+    if (peerConnection.current) {
+      // Verificar se o estado do peerConnection está "have-remote-offer"
+      if (peerConnection.current.signalingState !== "have-remote-offer") {
+        console.log('Tentando definir uma resposta quando o estado não é "have-remote-offer". Estado atual: ', peerConnection.current.signalingState);
+        return;
+      }
+  
+      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+    }
+  }, []);
+  
+  const handleICECandidate = useCallback(async (candidate: RTCIceCandidateInit | undefined) => {
+    if (candidate && peerConnection.current) {
+      await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  }, []);
+  
 
   // Criar a conexão WebRTC
   const createPeerConnection = useCallback(async () => {
     if (!peerConnection.current) {
       const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
       peerConnection.current = new RTCPeerConnection(configuration);
-
+  
       const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (localAudioRef.current) {
         localAudioRef.current.srcObject = localStream;
       }
-
+  
       localStream.getTracks().forEach((track) => {
         peerConnection.current?.addTrack(track, localStream);
       });
-
+  
       peerConnection.current.onicecandidate = (event) => {
         if (event.candidate) {
           socket.current?.send(JSON.stringify({
@@ -62,7 +77,7 @@ const Canais = () => {
           }));
         }
       };
-
+  
       peerConnection.current.ontrack = (event) => {
         const [remoteStream] = event.streams;
         if (remoteAudioRef.current) {
@@ -70,10 +85,12 @@ const Canais = () => {
         }
         setIsInConversation(true); // Outro usuário entrou na chamada
       };
-
+  
       setIsInCall(true);
     }
   }, []);
+  
+  
 
   useEffect(() => {
     const createWebSocket = () => {
