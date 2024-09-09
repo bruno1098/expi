@@ -388,154 +388,154 @@ export function Chat() {
   const [selectedTab, setSelectedTab] = useState("history");
 
 
-  return (<div className="flex flex-col h-screen">
-    <header className="bg-primary text-primary-foreground py-4 px-6 flex items-center justify-between sticky top-0 z-10">
-      <div className="flex items-center gap-4">
-        <Avatar className="w-8 h-8">
-          <AvatarImage src="/logo.png" alt="Chatbot" />
-          <AvatarFallback>CB</AvatarFallback>
-        </Avatar>
-        <h1 className="text-xl font-bold">Expi</h1>
-      </div>
-      <Button onClick={handleNewConversation} variant="ghost" className="p-2 rounded-full">
-        Nova Conversa
-      </Button>
-    </header>
-    <div className="flex-1 flex overflow-hidden">
-      <div className="w-64 border-r bg-background flex-shrink-0 flex flex-col">
-        <Tabs defaultValue="history" className="h-full flex flex-col" onValueChange={(value) => setSelectedTab(value)}>
-          <TabsList className="border-b">
-            <TabsTrigger value="history">Expi</TabsTrigger>
-            <TabsTrigger value="voicechat">Voice Chat</TabsTrigger>
-
-          </TabsList>
-
-          <TabsContent value="voicechat">
-            <Canais />
-          </TabsContent>
-          <TabsContent value="history" className="p-4 overflow-auto flex-1">
-            <div className="p-4 border-b">
-              <Input placeholder="Search conversations" className="w-full" />
-            </div>
-            <div className="p-4 overflow-auto flex-1">
-              {history.length > 0 ? (
-                history.map((conversation, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 rounded-md hover:bg-muted cursor-pointer">
-                    <div className="flex items-center gap-4" onClick={() => handleSelectConversation(index)}>
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src="/user.png" alt="User" />
-                        <AvatarFallback>H</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h4 className="font-medium">{conversation.title}</h4>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="p-2 rounded-full">
-                          <MoreHorizontalIcon className="w-5 h-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDeleteConversation(index)}>Excluir</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground">Nenhuma conversa ainda</p>
-              )}
-            </div>
-          </TabsContent>
-
-        </Tabs>
-      </div>
-
-
-       <div className="flex-1 flex flex-col">
-       {selectedTab === "voicechat" ? (
-          // Exibir os ícones dos usuários no meio da tela
-          <div className="flex flex-col items-center justify-center h-full">
-            <h2 className="text-2xl font-bold mb-4">Canais de Voz</h2>
-            {usersInCall.length > 0 ? (
-              <div className="flex flex-wrap justify-center gap-6">
-                {usersInCall.map((user, index) => (
-                  <div key={index} className="flex flex-col items-center">
-                    <Avatar className="w-16 h-16">
-                      <AvatarImage src="/user.png" alt="User" />
-                      <AvatarFallback>{user[0]}</AvatarFallback>
-                    </Avatar>
-                    <span className="mt-2 text-center">{user}</span>
-                  </div>
-                ))}
+  return (
+    <div className="flex flex-col h-screen">
+      <header className="bg-primary text-primary-foreground py-4 px-6 flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-4">
+          <Avatar className="w-8 h-8">
+            <AvatarImage src="/logo.png" alt="Chatbot" />
+            <AvatarFallback>CB</AvatarFallback>
+          </Avatar>
+          <h1 className="text-xl font-bold">Expi</h1>
+        </div>
+        <Button onClick={handleNewConversation} variant="ghost" className="p-2 rounded-full">
+          Nova Conversa
+        </Button>
+      </header>
+  
+      <div className="flex-1 flex overflow-hidden">
+        <div className="w-64 border-r bg-background flex-shrink-0 flex flex-col">
+          <Tabs defaultValue="history" className="h-full flex flex-col" onValueChange={(value) => setSelectedTab(value)}>
+            <TabsList className="border-b">
+              <TabsTrigger value="history">Expi</TabsTrigger>
+              <TabsTrigger value="voicechat">Voice Chat</TabsTrigger>
+            </TabsList>
+  
+            <TabsContent value="voicechat" className="p-4 overflow-auto flex-1">
+              {/* Mantenha apenas o canal sem exibir os usuários aqui */}
+              <Canais />
+            </TabsContent>
+  
+            <TabsContent value="history" className="p-4 overflow-auto flex-1">
+              <div className="p-4 border-b">
+                <Input placeholder="Search conversations" className="w-full" />
               </div>
-            ) : (
-              <p className="text-center text-muted-foreground">Nenhum usuário conectado ainda</p>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 p-6 overflow-auto">
-              <div className="grid gap-4">
-                {messages.map((message, index) => (
-                  <div key={index} className={`flex items-start gap-4 ${message.role === "user" ? "justify-end" : ""}`}>
-                    {message.role === "ai" && (
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src="/logo.png" alt="Chatbot" />
-                        <AvatarFallback>CB</AvatarFallback>
-                      </Avatar>
-                    )}
-                    <div className={`p-4 rounded-lg max-w-[80%] ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                      <p>{message.content}</p>
+              <div className="p-4 overflow-auto flex-1">
+                {history.length > 0 ? (
+                  history.map((conversation, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 rounded-md hover:bg-muted cursor-pointer">
+                      <div className="flex items-center gap-4" onClick={() => handleSelectConversation(index)}>
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src="/user.png" alt="User" />
+                          <AvatarFallback>H</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h4 className="font-medium">{conversation.title}</h4>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="p-2 rounded-full">
+                            <MoreHorizontalIcon className="w-5 h-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDeleteConversation(index)}>Excluir</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    {message.role === "user" && (
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src="/user.png" alt="User" />
-                        <AvatarFallback>U</AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                ))}
-                {loading && (
-                  <div className="flex justify-center">
-                    <p>Digitando...</p>
-                  </div>
+                  ))
+                ) : (
+                  <p className="text-center text-muted-foreground">Nenhuma conversa ainda</p>
                 )}
               </div>
-              <div ref={messageEndRef} />
+            </TabsContent>
+          </Tabs>
+        </div>
+  
+        <div className="flex-1 flex flex-col">
+          {selectedTab === "voicechat" ? (
+            // Exibir os ícones dos usuários no meio da tela
+            <div className="flex flex-col items-center justify-center h-full">
+              <h2 className="text-2xl font-bold mb-4">Canais de Voz</h2>
+              {usersInCall.length > 0 ? (
+                <div className="flex flex-wrap justify-center gap-6">
+                  {usersInCall.map((user, index) => (
+                    <div key={index} className="flex flex-col items-center">
+                      <Avatar className="w-16 h-16">
+                        <AvatarImage src="/user.png" alt="User" />
+                        <AvatarFallback>{user[0]}</AvatarFallback>
+                      </Avatar>
+                      <span className="mt-2 text-center">{user}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground">Nenhum usuário conectado ainda</p>
+              )}
             </div>
-
-            <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
-              <Textarea
-                placeholder="Digite sua mensagem..."
-                className="flex-1 mr-4 resize-none"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-              <Button onClick={handleSubmit}>
-                <SendIcon className="w-5 h-5" />
-              </Button>
-              <Button onClick={handleOpenFeedbackModal} variant="outline" className="ml-2">
-                Finalizar Conversa
-              </Button>
-              <Modal
-                isOpen={isFeedbackModalOpen}
-                onClose={handleCloseFeedbackModal}
-                title={modalTitle}
-                isLoading={modalLoading}
-              >
-                <p>{feedbackAnalysis || "Seu feedback foi enviado com sucesso!"}</p>
-              </Modal>
-            </div>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="flex-1 p-6 overflow-auto">
+                <div className="grid gap-4">
+                  {messages.map((message, index) => (
+                    <div key={index} className={`flex items-start gap-4 ${message.role === "user" ? "justify-end" : ""}`}>
+                      {message.role === "ai" && (
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src="/logo.png" alt="Chatbot" />
+                          <AvatarFallback>CB</AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className={`p-4 rounded-lg max-w-[80%] ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                        <p>{message.content}</p>
+                      </div>
+                      {message.role === "user" && (
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src="/user.png" alt="User" />
+                          <AvatarFallback>U</AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  ))}
+                  {loading && (
+                    <div className="flex justify-center">
+                      <p>Digitando...</p>
+                    </div>
+                  )}
+                </div>
+                <div ref={messageEndRef} />
+              </div>
+  
+              <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
+                <Textarea
+                  placeholder="Digite sua mensagem..."
+                  className="flex-1 mr-4 resize-none"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+                <Button onClick={handleSubmit}>
+                  <SendIcon className="w-5 h-5" />
+                </Button>
+                <Button onClick={handleOpenFeedbackModal} variant="outline" className="ml-2">
+                  Finalizar Conversa
+                </Button>
+                <Modal
+                  isOpen={isFeedbackModalOpen}
+                  onClose={handleCloseFeedbackModal}
+                  title={modalTitle}
+                  isLoading={modalLoading}
+                >
+                  <p>{feedbackAnalysis || "Seu feedback foi enviado com sucesso!"}</p>
+                </Modal>
+              </div>
+            </>
+          )}
+        </div>
       </div>
-
     </div>
-  </div>
   );
-
+  
 
 }
 
