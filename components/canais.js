@@ -4,7 +4,7 @@ import { FaPhoneAlt } from "react-icons/fa";
 
 const Canais = () => {
   const [isInCall, setIsInCall] = useState(false);
-  const [isInConversation, setIsInConversation] = useState(false);
+  const [isInConversation, setIsInConversation] = useState(false); 
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const peerConnection = useRef(null);
@@ -23,17 +23,9 @@ const Canais = () => {
     }
   }, []);
 
-  const processIceCandidates = async () => {
-    while (iceCandidateQueue.current.length > 0 && peerConnection.current.signalingState === 'stable') {
-      const candidate = iceCandidateQueue.current.shift();
-      await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
-    }
-  };
-  
-
   const handleICECandidate = useCallback(async (candidate) => {
     if (candidate) {
-      if (peerConnection.current && peerConnection.current.remoteDescription && peerConnection.current.signalingState === 'stable') {
+      if (peerConnection.current && peerConnection.current.remoteDescription && peerConnection.current.remoteDescription.type !== '') {
         await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
       } else {
         iceCandidateQueue.current.push(candidate);
@@ -41,22 +33,21 @@ const Canais = () => {
       }
     }
   }, []);
-  
 
   const createPeerConnection = useCallback(async () => {
     if (!peerConnection.current) {
       const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
       peerConnection.current = new RTCPeerConnection(configuration);
-
+  
       const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (localAudioRef.current) {
         localAudioRef.current.srcObject = localStream;
       }
-
+  
       localStream.getTracks().forEach((track) => {
-        peerConnection.current?.addTrack(track, localStream);
+        peerConnection.current.addTrack(track, localStream);
       });
-
+  
       peerConnection.current.onicecandidate = (event) => {
         if (event.candidate) {
           socket.current?.send(JSON.stringify({
@@ -65,34 +56,32 @@ const Canais = () => {
           }));
         }
       };
-
+  
       peerConnection.current.ontrack = (event) => {
         const [remoteStream] = event.streams;
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = remoteStream;
         }
-        setIsInConversation(true); 
+        setIsInConversation(true);
       };
-
+  
       setIsInCall(true);
     }
   }, []);
 
   const startCall = async () => {
     await createPeerConnection();
-    socket.current = new WebSocket('ws://localhost:8080'); 
+    socket.current = new WebSocket('ws://localhost:8080');
 
-    socket.current.onopen = async () => {
-      if (peerConnection.current) {
-        const offer = await peerConnection.current.createOffer();
-        await peerConnection.current.setLocalDescription(offer);
+    if (peerConnection.current) {
+      const offer = await peerConnection.current.createOffer();
+      await peerConnection.current.setLocalDescription(offer);
 
-        socket.current?.send(JSON.stringify({
-          type: 'offer',
-          offer
-        }));
-      }
-    };
+      socket.current.send(JSON.stringify({
+        type: 'offer',
+        offer
+      }));
+    }
   };
 
   const endCall = () => {
@@ -108,28 +97,24 @@ const Canais = () => {
     if (!peerConnection.current) {
       await createPeerConnection();
     }
-  
-    if (peerConnection.current.signalingState === "stable") {
+
+    if (peerConnection.current.signalingState === "stable" || peerConnection.current.signalingState === "have-local-offer") {
       await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await peerConnection.current.createAnswer();
       await peerConnection.current.setLocalDescription(answer);
-  
-      socket.current?.send(JSON.stringify({
+
+      socket.current.send(JSON.stringify({
         type: 'answer',
         answer
       }));
-  
-      // Processa os candidatos ICE armazenados quando o estado for estável
-      processIceCandidates();
-  
     } else {
-      console.log('O estado de sinalização não está estável: ', peerConnection.current.signalingState);
+      console.log('Estado de sinalização não estável:', peerConnection.current.signalingState);
     }
   }, [createPeerConnection]);
-  
+
   useEffect(() => {
     const createWebSocket = () => {
-      socket.current = new WebSocket('ws://localhost:8080'); 
+      socket.current = new WebSocket('ws://localhost:8080');
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
@@ -138,22 +123,28 @@ const Canais = () => {
       socket.current.onclose = () => {
         console.log('WebSocket fechado, tentando reconectar...');
         setTimeout(() => {
-          createWebSocket();  
+          createWebSocket();
         }, 3000);
       };
 
       socket.current.onmessage = (message) => {
-        try {
-          const data = JSON.parse(message.data);
-          if (data.type === 'offer') {
-            handleOffer(data.offer);
-          } else if (data.type === 'answer') {
-            handleAnswer(data.answer);
-          } else if (data.type === 'ice-candidate') {
-            handleICECandidate(data.candidate);
+        if (typeof message.data === 'object' && message.data instanceof Blob) {
+          console.log('Áudio recebido:', message.data);
+        } else {
+          try {
+            const data = JSON.parse(message.data);
+            console.log('Mensagem JSON recebida:', data);
+      
+            if (data.type === 'offer') {
+              handleOffer(data.offer);
+            } else if (data.type === 'answer') {
+              handleAnswer(data.answer);
+            } else if (data.type === 'ice-candidate') {
+              handleICECandidate(data.candidate);
+            }
+          } catch (error) {
+            console.error('Erro ao analisar mensagem JSON:', error);
           }
-        } catch (error) {
-          console.error('Erro ao analisar mensagem JSON:', error);
         }
       };
     };
@@ -163,8 +154,6 @@ const Canais = () => {
     return () => {
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         socket.current.send(JSON.stringify(onmessage));
-      } else {
-        console.log('WebSocket ainda está conectando ou já foi fechado.');
       }
     };
   }, [handleOffer, handleAnswer, handleICECandidate]);
