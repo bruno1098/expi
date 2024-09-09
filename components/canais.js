@@ -4,22 +4,16 @@ import { FaPhoneAlt } from "react-icons/fa";
 
 const Canais = () => {
   const [isInCall, setIsInCall] = useState(false);
-  const [isInConversation, setIsInConversation] = useState(false); // Indica se a outra pessoa está conectada
-  const localAudioRef = useRef<HTMLAudioElement | null>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
-  const socket = useRef<WebSocket | null>(null); // WebSocket para sinalização
-  const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]); // Fila para armazenar candidatos ICE temporariamente
+  const [isInConversation, setIsInConversation] = useState(false);
+  const localAudioRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+  const peerConnection = useRef(null);
+  const socket = useRef(null); 
+  const iceCandidateQueue = useRef([]); 
 
-  // Função para lidar com ofertas WebRTC recebidas
-
-  
-  
-  const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {
+  const handleAnswer = useCallback(async (answer) => {
     if (peerConnection.current) {
       await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
-  
-      // Agora que a remoteDescription foi definida, processar a fila de candidatos
       while (iceCandidateQueue.current.length > 0) {
         const candidate = iceCandidateQueue.current.shift();
         if (candidate) {
@@ -28,39 +22,32 @@ const Canais = () => {
       }
     }
   }, []);
-  
-  
-  
 
-  const handleICECandidate = useCallback(async (candidate: RTCIceCandidateInit | undefined) => {
+  const handleICECandidate = useCallback(async (candidate) => {
     if (candidate) {
-      if (peerConnection.current?.remoteDescription) {
-        // Adicionar o candidato imediatamente
+      if (peerConnection.current && peerConnection.current.remoteDescription) {
         await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
       } else {
-        // Colocar na fila de candidatos se remoteDescription não estiver pronta
         iceCandidateQueue.current.push(candidate);
+        console.log('Candidato ICE enfileirado.');
       }
     }
   }, []);
-  
-  
 
-  // Criar a conexão WebRTC
   const createPeerConnection = useCallback(async () => {
     if (!peerConnection.current) {
       const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
       peerConnection.current = new RTCPeerConnection(configuration);
-  
+
       const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (localAudioRef.current) {
         localAudioRef.current.srcObject = localStream;
       }
-  
+
       localStream.getTracks().forEach((track) => {
         peerConnection.current?.addTrack(track, localStream);
       });
-  
+
       peerConnection.current.onicecandidate = (event) => {
         if (event.candidate) {
           socket.current?.send(JSON.stringify({
@@ -69,36 +56,34 @@ const Canais = () => {
           }));
         }
       };
-  
+
       peerConnection.current.ontrack = (event) => {
         const [remoteStream] = event.streams;
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = remoteStream;
         }
-        setIsInConversation(true); // Outro usuário entrou na chamada
+        setIsInConversation(true); 
       };
-  
+
       setIsInCall(true);
     }
   }, []);
-  
-  
 
-
-  // Inicia uma chamada, enviando uma oferta via WebSocket
   const startCall = async () => {
     await createPeerConnection();
-    socket.current = new WebSocket('ws://localhost:8080'); // Substituir pela URL do seu servidor WebSocket
+    socket.current = new WebSocket('ws://localhost:8080'); 
 
-    if (peerConnection.current) {
-      const offer = await peerConnection.current.createOffer();
-      await peerConnection.current.setLocalDescription(offer);
+    socket.current.onopen = async () => {
+      if (peerConnection.current) {
+        const offer = await peerConnection.current.createOffer();
+        await peerConnection.current.setLocalDescription(offer);
 
-      socket.current?.send(JSON.stringify({
-        type: 'offer',
-        offer
-      }));
-    }
+        socket.current?.send(JSON.stringify({
+          type: 'offer',
+          offer
+        }));
+      }
+    };
   };
 
   const endCall = () => {
@@ -110,36 +95,28 @@ const Canais = () => {
     }
   };
 
-  const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
+  const handleOffer = useCallback(async (offer) => {
     if (!peerConnection.current) {
       await createPeerConnection();
     }
-  
-    if (peerConnection.current?.signalingState === "stable") {
+
+    if (peerConnection.current.signalingState === "stable") {
       await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
-  
       const answer = await peerConnection.current.createAnswer();
       await peerConnection.current.setLocalDescription(answer);
-  
+
       socket.current?.send(JSON.stringify({
         type: 'answer',
         answer
       }));
-  
-      // Agora que a remoteDescription foi definida, processar a fila de candidatos
-      while (iceCandidateQueue.current.length > 0) {
-        const candidate = iceCandidateQueue.current.shift();
-        if (candidate) {
-          await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
-        }
-      }
     } else {
-      console.log('O estado de sinalização não está estável. Estado atual: ', peerConnection.current?.signalingState);
+      console.log('O estado de sinalização não está estável: ', peerConnection.current.signalingState);
     }
   }, [createPeerConnection]);
+
   useEffect(() => {
     const createWebSocket = () => {
-      socket.current = new WebSocket('ws://localhost:8080'); // Substituir pela URL do seu servidor WebSocket
+      socket.current = new WebSocket('ws://localhost:8080'); 
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
@@ -148,34 +125,24 @@ const Canais = () => {
       socket.current.onclose = () => {
         console.log('WebSocket fechado, tentando reconectar...');
         setTimeout(() => {
-          createWebSocket();  // Tenta reconectar após um tempo
+          createWebSocket();  
         }, 3000);
       };
 
       socket.current.onmessage = (message) => {
-        // Verifique se a mensagem é um blob (áudio)
-        if (typeof message.data === 'object' && message.data instanceof Blob) {
-          console.log('Áudio recebido como Blob:', message.data);
-          // Aqui você pode fazer o que quiser com o blob recebido, como salvá-lo ou processá-lo
-        } else {
-          // Trata as mensagens de sinalização (WebRTC) como JSON
-          try {
-            const data = JSON.parse(message.data);
-            console.log('Mensagem JSON recebida:', data);
-      
-            if (data.type === 'offer') {
-              handleOffer(data.offer);
-            } else if (data.type === 'answer') {
-              handleAnswer(data.answer);
-            } else if (data.type === 'ice-candidate') {
-              handleICECandidate(data.candidate);
-            }
-          } catch (error) {
-            console.error('Erro ao analisar mensagem JSON:', error);
+        try {
+          const data = JSON.parse(message.data);
+          if (data.type === 'offer') {
+            handleOffer(data.offer);
+          } else if (data.type === 'answer') {
+            handleAnswer(data.answer);
+          } else if (data.type === 'ice-candidate') {
+            handleICECandidate(data.candidate);
           }
+        } catch (error) {
+          console.error('Erro ao analisar mensagem JSON:', error);
         }
       };
-      
     };
 
     createWebSocket();
@@ -188,7 +155,6 @@ const Canais = () => {
       }
     };
   }, [handleOffer, handleAnswer, handleICECandidate]);
-
 
   return (
     <div className="flex-1 flex flex-col p-6 overflow-auto">
