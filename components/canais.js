@@ -20,9 +20,13 @@ const Canais = () => {
 
     // Recebe o sinal e envia através do WebSocket
     peerInstance.on('signal', (data) => {
-      console.log('Sinal enviado:', data); // Verifique os dados de sinal
-      socket.current.send(JSON.stringify(data));
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+        socket.current.send(JSON.stringify(data));
+      } else {
+        console.error('WebSocket ainda não está aberto para enviar mensagens.');
+      }
     });
+    
 
     // Quando o stream remoto for recebido
     peerInstance.on('stream', (stream) => {
@@ -56,6 +60,7 @@ const Canais = () => {
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
+        createPeer(true); 
       };
 
       socket.current.onmessage = (message) => {
@@ -120,26 +125,28 @@ const Canais = () => {
   useEffect(() => {
     const createWebSocket = () => {
       socket.current = new WebSocket('wss://3a8a-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
-
+  
       socket.current.onopen = () => {
-        console.log('Esperando por chamadas...');
+        console.log('WebSocket conectado com sucesso');
       };
-
-      socket.current.onmessage = (message) => {
-        console.log('Chamada recebida');
-        handleIncomingCall(); // Chamada recebida
-      };
-
+  
       socket.current.onerror = (error) => {
         console.error('Erro no WebSocket:', error);
       };
-
+  
       socket.current.onclose = () => {
         console.log('WebSocket desconectado, tentando reconectar...');
-        setTimeout(createWebSocket, 3000); // Tentar reconectar após 3 segundos
+        setTimeout(() => {
+          createWebSocket(); // Tentar reconectar automaticamente
+        }, 3000);
+      };
+  
+      socket.current.onmessage = (message) => {
+        console.log('Mensagem recebida:', message.data);
+        handleIncomingCall(); // Chamada recebida
       };
     };
-
+  
     createWebSocket();
     
     return () => {
@@ -148,6 +155,9 @@ const Canais = () => {
       }
     };
   }, [handleIncomingCall]);
+  
+
+
 
   return (
     <div className="flex-1 flex flex-col p-6 overflow-auto">
