@@ -17,12 +17,12 @@ const Canais = () => {
       trickle: false,
       stream: localAudioRef.current.srcObject // Passa o áudio local para o peer
     });
-  
+
     // Recebe o sinal e envia através do WebSocket
     peerInstance.on('signal', (data) => {
       socket.current.send(JSON.stringify(data));
     });
-  
+
     // Quando o stream remoto for recebido
     peerInstance.on('stream', (stream) => {
       if (remoteAudioRef.current) {
@@ -30,11 +30,11 @@ const Canais = () => {
       }
       setIsInConversation(true); // Outro usuário entrou na chamada
     });
-  
+
     peerInstance.on('close', () => {
       endCall();
     });
-  
+
     peer.current = peerInstance;
   }, []);
 
@@ -65,19 +65,6 @@ const Canais = () => {
       console.log('WebSocket desconectado');
       endCall();
     };
-    p.on('signal', (data) => {
-      console.log('Sinal enviado:', data); // Verifique os dados de sinal
-      socket.current.send(JSON.stringify(data));
-    });
-    
-    socket.current.onmessage = (message) => {
-      console.log('Mensagem recebida pelo WebSocket:', message.data); // Verifique as mensagens recebidas
-      const data = JSON.parse(message.data);
-      if (peer.current) {
-        peer.current.signal(data);
-      }
-    };
-    
 
     // Cria o peer como iniciador
     createPeer(true);
@@ -103,7 +90,7 @@ const Canais = () => {
     }
 
     // Configura o WebSocket
-   socket.current = new WebSocket('wss://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+    socket.current = new WebSocket('wss://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
 
     socket.current.onmessage = (message) => {
       const data = JSON.parse(message.data);
@@ -120,7 +107,7 @@ const Canais = () => {
   useEffect(() => {
     // Configura o socket para lidar com chamadas recebidas
     const createWebSocket = () => {
-     socket.current = new WebSocket('wss://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+      socket.current = new WebSocket('wss://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
 
       socket.current.onopen = () => {
         console.log('Esperando por chamadas...');
