@@ -43,6 +43,7 @@ export function Chat() {
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [modalLoading, setModalLoading] = useState(false);
+  const [usersInCall, setUsersInCall] = useState([]); 
 
 
   const client = axios.create({
@@ -451,8 +452,28 @@ export function Chat() {
       </div>
 
 
-      <div className="flex-1 flex flex-col">
-        {selectedTab !== "voicechat" && ( // Adiciona essa verificação para ocultar a seção quando a aba "voicechat" for selecionada
+       <div className="flex-1 flex flex-col">
+        {selectedTab === "voicechat" ? (
+          // Exibir usuários no meio da tela quando a aba de voicechat estiver selecionada
+          <div className="flex flex-col items-center justify-center h-full">
+            <h2 className="text-2xl font-bold mb-4">Canais de Voz</h2>
+            {usersInCall.length > 0 ? (
+              <div className="flex flex-wrap justify-center gap-6">
+                {usersInCall.map((user, index) => (
+                  <div key={index} className="flex flex-col items-center">
+                    <Avatar className="w-16 h-16">
+                      <AvatarImage src="/user.png" alt="User" />
+                      <AvatarFallback>{user[0]}</AvatarFallback>
+                    </Avatar>
+                    <span className="mt-2 text-center">{user}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground">Nenhum usuário conectado ainda</p>
+            )}
+          </div>
+        ) : (
           <>
             <div className="flex-1 p-6 overflow-auto">
               <div className="grid gap-4">
@@ -483,6 +504,7 @@ export function Chat() {
               </div>
               <div ref={messageEndRef} />
             </div>
+
             <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
               <Textarea
                 placeholder="Digite sua mensagem..."
@@ -501,7 +523,7 @@ export function Chat() {
                 isOpen={isFeedbackModalOpen}
                 onClose={handleCloseFeedbackModal}
                 title={modalTitle}
-                isLoading={modalLoading} // Use modalLoading aqui
+                isLoading={modalLoading}
               >
                 <p>{feedbackAnalysis || "Seu feedback foi enviado com sucesso!"}</p>
               </Modal>
