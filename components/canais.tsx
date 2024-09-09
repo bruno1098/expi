@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { FaPhoneAlt } from "react-icons/fa";
 
@@ -10,26 +10,88 @@ const Canais = () => {
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const socket = useRef<WebSocket | null>(null); // WebSocket para sinalização
 
+  // Função para lidar com ofertas WebRTC recebidas
+  const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
+    if (!peerConnection.current) {
+      await createPeerConnection();
+    }
+
+    await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(offer));
+
+    const answer = await peerConnection.current?.createAnswer();
+    await peerConnection.current?.setLocalDescription(answer);
+
+    socket.current?.send(JSON.stringify({
+      type: 'answer',
+      answer
+    }));
+  }, []);
+
+  // Função para lidar com respostas WebRTC recebidas
+  const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {
+    await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(answer));
+  }, []);
+
+  // Função para lidar com candidatos ICE recebidos
+  const handleICECandidate = useCallback(async (candidate: RTCIceCandidateInit | undefined) => {
+    await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
+  }, []);
+
+  // Criar a conexão WebRTC
+  const createPeerConnection = useCallback(async () => {
+    if (!peerConnection.current) {
+      const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+      peerConnection.current = new RTCPeerConnection(configuration);
+
+      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (localAudioRef.current) {
+        localAudioRef.current.srcObject = localStream;
+      }
+
+      localStream.getTracks().forEach((track) => {
+        peerConnection.current?.addTrack(track, localStream);
+      });
+
+      peerConnection.current.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.current?.send(JSON.stringify({
+            type: 'ice-candidate',
+            candidate: event.candidate
+          }));
+        }
+      };
+
+      peerConnection.current.ontrack = (event) => {
+        const [remoteStream] = event.streams;
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream;
+        }
+        setIsInConversation(true); // Outro usuário entrou na chamada
+      };
+
+      setIsInCall(true);
+    }
+  }, []);
+
   useEffect(() => {
     const createWebSocket = () => {
       socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com');
-      
+
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
       };
-      
+
       socket.current.onclose = () => {
         console.log('WebSocket fechado, tentando reconectar...');
         setTimeout(() => {
           createWebSocket();  // Tenta reconectar após um tempo
         }, 3000);
       };
-  
+
       socket.current.onmessage = (message) => {
         const data = JSON.parse(message.data);
         console.log('Mensagem recebida:', data);
-  
-        // Suas lógicas para ofertas, respostas e ICE candidates
+
         if (data.type === 'offer') {
           handleOffer(data.offer);
         } else if (data.type === 'answer') {
@@ -39,116 +101,30 @@ const Canais = () => {
         }
       };
     };
-    const sendMessage = (message: any) => {
-        if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-          socket.current.send(JSON.stringify(message));
-        } else {
-          console.log('WebSocket não está aberto');
-        }
-      };
-      
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-          if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-            socket.current.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 25000);  // Envia um ping a cada 25 segundos
-      
-        return () => clearInterval(interval);
-      }, []);
-      
-  
-    // Chama a função para criar o WebSocket na inicialização
     createWebSocket();
-  
+
     return () => {
       if (socket.current) {
         socket.current.close();
       }
     };
-  }, []);
-  
-  
+  }, [handleOffer, handleAnswer, handleICECandidate]);
 
-  // Função para lidar com ofertas WebRTC recebidas
-  const handleOffer = async (offer: RTCSessionDescriptionInit) => {
-    if (!peerConnection.current) {
-      await createPeerConnection();
-    }
-  
-    await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(offer));
-  
-    const answer = await peerConnection.current?.createAnswer();
-    await peerConnection.current?.setLocalDescription(answer);
-  
-    socket.current?.send(JSON.stringify({
-      type: 'answer',
-      answer
-    }));
-  };
-  
-
-  // Função para lidar com respostas WebRTC recebidas
-  const handleAnswer = async (answer: RTCSessionDescriptionInit) => {
-    await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(answer));
-  };
-
-  // Função para lidar com candidatos ICE recebidos
-  const handleICECandidate = async (candidate: RTCIceCandidateInit | undefined) => {
-    await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
-  };
-
-  const createPeerConnection = async () => {
-    if (!peerConnection.current) {
-      const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-      peerConnection.current = new RTCPeerConnection(configuration);
-  
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (localAudioRef.current) {
-        localAudioRef.current.srcObject = localStream;
-      }
-  
-      localStream.getTracks().forEach((track) => {
-        peerConnection.current?.addTrack(track, localStream);
-      });
-  
-      peerConnection.current.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.current?.send(JSON.stringify({
-            type: 'ice-candidate',
-            candidate: event.candidate
-          }));
-        }
-      };
-  
-      peerConnection.current.ontrack = (event) => {
-        const [remoteStream] = event.streams;
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = remoteStream;
-        }
-        setIsInConversation(true); // Outro usuário entrou na chamada
-      };
-  
-      setIsInCall(true);
-    }
-  };
-  
   // Inicia uma chamada, enviando uma oferta via WebSocket
   const startCall = async () => {
     await createPeerConnection();
-  
+
     if (peerConnection.current) {
       const offer = await peerConnection.current.createOffer();
       await peerConnection.current.setLocalDescription(offer);
-  
+
       socket.current?.send(JSON.stringify({
         type: 'offer',
         offer
       }));
     }
   };
-  
 
   const endCall = () => {
     if (peerConnection.current) {
@@ -171,11 +147,7 @@ const Canais = () => {
       )}
 
       <div className="grid gap-4">
-        {/* Lista de Canais de Voz */}
-        <div
-          className="flex items-center gap-4 p-3 bg-muted rounded-md hover:bg-muted-hover cursor-pointer"
-          onClick={startCall}
-        >
+        <div className="flex items-center gap-4 p-3 bg-muted rounded-md hover:bg-muted-hover cursor-pointer" onClick={startCall}>
           <Avatar className="w-10 h-10">
             <AvatarImage src="/icons/channel1.png" alt="Channel 1" />
             <AvatarFallback>C1</AvatarFallback>
