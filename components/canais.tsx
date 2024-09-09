@@ -10,6 +10,7 @@ const Canais = () => {
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const socket = useRef<WebSocket | null>(null); // WebSocket para sinalização
 
+  
   // Função para lidar com ofertas WebRTC recebidas
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
     if (!peerConnection.current) {
@@ -76,6 +77,7 @@ const Canais = () => {
   useEffect(() => {
     const createWebSocket = () => {
       socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com');
+      
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
@@ -85,7 +87,7 @@ const Canais = () => {
         console.log('WebSocket fechado, tentando reconectar...');
         setTimeout(() => {
           createWebSocket();  // Tenta reconectar após um tempo
-        }, 3000);
+        }, 3000);``
       };
 
       socket.current.onmessage = (message) => {
@@ -105,15 +107,19 @@ const Canais = () => {
     createWebSocket();
 
     return () => {
-      if (socket.current) {
-        socket.current.close();
-      }
+        if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+            socket.current.send(JSON.stringify(onmessage));
+          } else {
+            console.log('WebSocket ainda está conectando ou já foi fechado.');
+          }
+          
     };
   }, [handleOffer, handleAnswer, handleICECandidate]);
 
   // Inicia uma chamada, enviando uma oferta via WebSocket
   const startCall = async () => {
     await createPeerConnection();
+    socket.current = new WebSocket('ws://localhost:8080');
 
     if (peerConnection.current) {
       const offer = await peerConnection.current.createOffer();
@@ -126,6 +132,7 @@ const Canais = () => {
     }
   };
 
+  
   const endCall = () => {
     if (peerConnection.current) {
       peerConnection.current.close();
