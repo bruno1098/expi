@@ -4,7 +4,6 @@ import Peer from 'simple-peer';
 
 const Canais = ({ usersInCall, setUsersInCall }) => {
   const [isInCall, setIsInCall] = useState(false);
-  const [usersInCall, setUsersInCall] = useState([]); // Lista de usuários na chamada
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
@@ -41,7 +40,7 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     });
 
     peer.current = peerInstance;
-  }, []);
+  }, [setUsersInCall]);
 
   const startCall = async () => {
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -104,7 +103,7 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     peer.current.signal(data);
     setIsInCall(true);
     setUsersInCall(['Outro Usuário']); // Adiciona o outro usuário ao iniciar a chamada
-  }, [createPeer]);
+  }, [createPeer, setUsersInCall]);
 
   useEffect(() => {
     if (!socket.current) {
