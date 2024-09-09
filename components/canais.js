@@ -23,9 +23,17 @@ const Canais = () => {
     }
   }, []);
 
+  const processIceCandidates = async () => {
+    while (iceCandidateQueue.current.length > 0 && peerConnection.current.signalingState === 'stable') {
+      const candidate = iceCandidateQueue.current.shift();
+      await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  };
+  
+
   const handleICECandidate = useCallback(async (candidate) => {
     if (candidate) {
-      if (peerConnection.current && peerConnection.current.remoteDescription) {
+      if (peerConnection.current && peerConnection.current.remoteDescription && peerConnection.current.signalingState === 'stable') {
         await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
       } else {
         iceCandidateQueue.current.push(candidate);
@@ -33,6 +41,7 @@ const Canais = () => {
       }
     }
   }, []);
+  
 
   const createPeerConnection = useCallback(async () => {
     if (!peerConnection.current) {
@@ -99,21 +108,25 @@ const Canais = () => {
     if (!peerConnection.current) {
       await createPeerConnection();
     }
-
+  
     if (peerConnection.current.signalingState === "stable") {
       await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await peerConnection.current.createAnswer();
       await peerConnection.current.setLocalDescription(answer);
-
+  
       socket.current?.send(JSON.stringify({
         type: 'answer',
         answer
       }));
+  
+      // Processa os candidatos ICE armazenados quando o estado for estável
+      processIceCandidates();
+  
     } else {
       console.log('O estado de sinalização não está estável: ', peerConnection.current.signalingState);
     }
   }, [createPeerConnection]);
-
+  
   useEffect(() => {
     const createWebSocket = () => {
       socket.current = new WebSocket('ws://localhost:8080'); 
