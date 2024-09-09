@@ -9,12 +9,7 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
   const peer = useRef(null);
   const socket = useRef(null);
 
-  useEffect(() => {
-    // Simulando usuários entrando na chamada
-    const newUsers = ["Outro Usuário", "Você"];
-    setUsersInCall(newUsers);
-  }, [setUsersInCall]);
-
+  // Função para criar o peer
   const createPeer = useCallback((initiator) => {
     const peerInstance = new Peer({
       initiator,
@@ -42,7 +37,8 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     peer.current = peerInstance;
   }, [setUsersInCall]);
 
-  const startCall = async () => {
+  // Entrar no canal de voz ao clicar na aba
+  const joinChannel = async () => {
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
@@ -77,6 +73,7 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     setUsersInCall(['Você']); // Adiciona o usuário atual na lista de usuários
   };
 
+  // Sair do canal de voz
   const endCall = () => {
     if (peer.current) {
       peer.current.destroy();
@@ -90,6 +87,7 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     setUsersInCall([]); // Reseta os usuários na chamada
   };
 
+  // Quando alguém entra no canal
   const handleIncomingCall = useCallback(async (data) => {
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
@@ -102,9 +100,10 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
 
     peer.current.signal(data);
     setIsInCall(true);
-    setUsersInCall(['Outro Usuário']); // Adiciona o outro usuário ao iniciar a chamada
+    setUsersInCall(prevUsers => [...prevUsers, 'Outro Usuário']); // Adiciona o outro usuário
   }, [createPeer, setUsersInCall]);
 
+  // Efeito que se ativa ao entrar no canal
   useEffect(() => {
     if (!socket.current) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
@@ -127,11 +126,15 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
       };
     }
 
+    // Join the channel on mount
+    joinChannel(); // Aqui entra no canal automaticamente
+
     return () => {
       if (socket.current) {
         socket.current.close();
         socket.current = null;
       }
+      endCall(); // Sair do canal ao desmontar o componente
     };
   }, [handleIncomingCall]);
 
@@ -139,21 +142,20 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     <div className="p-6">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
 
-      {usersInCall.length > 0 && (
+      {/* Mostrar se estiver em uma chamada */}
+      {isInCall && (
         <div className="bg-green-500 text-white p-4 rounded-md">
-          <span>Você está em uma chamada!</span>
+          <FaPhoneAlt /> Você está em uma chamada!
         </div>
       )}
 
       <div className="mt-4">
-        {usersInCall.length > 0 ? (
+        {/* Mostrar usuários conectados */}
+        {isInCall && usersInCall.length > 0 ? (
           <div>
             {usersInCall.map((user, index) => (
               <div key={index} className="flex items-center gap-4 mt-2">
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                  {/* Ícone do usuário */}
-                  <span className="text-black font-bold">{user[0]}</span>
-                </div>
+                <FaUserCircle className="text-gray-700 w-6 h-6" />
                 <span>{user}</span>
               </div>
             ))}
@@ -163,9 +165,15 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
         )}
       </div>
 
-      <button onClick={() => setUsersInCall([])} className="bg-red-500 text-white p-2 mt-4 rounded-md">
-        Sair do Canal
-      </button>
+      {/* Sair do canal */}
+      {isInCall && (
+        <button onClick={endCall} className="bg-red-500 text-white p-2 mt-4 rounded-md">
+          Sair do Canal
+        </button>
+      )}
+
+      <audio ref={localAudioRef} autoPlay muted />
+      <audio ref={remoteAudioRef} autoPlay />
     </div>
   );
 };
