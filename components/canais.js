@@ -65,6 +65,19 @@ const Canais = () => {
       console.log('WebSocket desconectado');
       endCall();
     };
+    p.on('signal', (data) => {
+      console.log('Sinal enviado:', data); // Verifique os dados de sinal
+      socket.current.send(JSON.stringify(data));
+    });
+    
+    socket.current.onmessage = (message) => {
+      console.log('Mensagem recebida pelo WebSocket:', message.data); // Verifique as mensagens recebidas
+      const data = JSON.parse(message.data);
+      if (peer.current) {
+        peer.current.signal(data);
+      }
+    };
+    
 
     // Cria o peer como iniciador
     createPeer(true);
