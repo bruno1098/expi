@@ -43,23 +43,29 @@ const Canais = () => {
       localAudioRef.current.srcObject = localStream;
     }
 
-    socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+    if (!socket.current) {
+      socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
 
-    socket.current.onopen = () => {
-      console.log('Conexão WebSocket estabelecida');
-    };
+      socket.current.onopen = () => {
+        console.log('Conexão WebSocket estabelecida');
+      };
 
-    socket.current.onmessage = (message) => {
-      const data = JSON.parse(message.data);
-      if (peer.current) {
-        peer.current.signal(data);``
-      }
-    };
+      socket.current.onmessage = (message) => {
+        const data = JSON.parse(message.data);
+        if (peer.current) {
+          peer.current.signal(data);
+        }
+      };
 
-    socket.current.onclose = () => {
-      console.log('WebSocket desconectado');
-      endCall();
-    };
+      socket.current.onclose = () => {
+        console.log('WebSocket desconectado');
+        endCall();
+      };
+
+      socket.current.onerror = (error) => {
+        console.error('Erro no WebSocket:', error);
+      };
+    }
 
     createPeer(true);
     setIsInCall(true);
@@ -72,6 +78,7 @@ const Canais = () => {
     }
     if (socket.current) {
       socket.current.close();
+      socket.current = null;
     }
     setIsInCall(false);
     setIsInConversation(false);
@@ -82,72 +89,45 @@ const Canais = () => {
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
     }
-  
+
     if (!peer.current || peer.current.destroyed) {
       createPeer(false);  // Apenas cria o peer se ele não foi destruído
     }
-  
+
     peer.current.signal(data);  // Certifique-se de chamar o signal apenas se o peer existir
     setIsInCall(true);
   }, [createPeer]);
-  
-  socket.current.onmessage = (message) => {
-    const data = JSON.parse(message.data);
-    
-    if (peer.current && !peer.current.destroyed) {
-      peer.current.signal(data);  // Certifique-se de que o peer não foi destruído antes de sinalizar
-    } else {
-      console.log("Peer já foi destruído, sinalização ignorada.");
-    }
-  };
-  
 
   useEffect(() => {
-    const createWebSocket = () => {
+    if (!socket.current) {
       socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
-  
+      
       socket.current.onopen = () => {
-        console.log('WebSocket conectado');
+        console.log('Esperando por chamadas...');
       };
-  
+
+      socket.current.onmessage = (message) => {
+        const data = JSON.parse(message.data);
+        handleIncomingCall(data);
+      };
+
       socket.current.onerror = (error) => {
         console.error('Erro no WebSocket:', error);
       };
-  
-      socket.current.onmessage = (message) => {
-        if (message && peer.current) {
-          const data = JSON.parse(message.data);
-          peer.current.signal(data);
-        } else {
-          console.log('Mensagem recebida, mas o peer não está disponível ou a mensagem é nula.');
-        }
-      };
-  
+
       socket.current.onclose = () => {
         console.log('WebSocket desconectado');
       };
-    };
-  
-    createWebSocket();
-  
+    }
+
     return () => {
       if (socket.current) {
         socket.current.close();
+        socket.current = null;
       }
     };
   }, [handleIncomingCall]);
-  
-  if (socket.current) {
-    socket.current.onmessage = (message) => {
-      const data = JSON.parse(message.data);
-      if (peer.current) {
-        peer.current.signal(data);
-      }
-    };
-  } else {
-    console.error('WebSocket não está inicializado.');
-  }
-  
+
   return (
     <div className="p-6">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
