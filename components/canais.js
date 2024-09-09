@@ -4,12 +4,17 @@ import Peer from 'simple-peer';
 
 const Canais = ({ usersInCall, setUsersInCall }) => {
   const [isInCall, setIsInCall] = useState(false);
+  const [usersInCall, setUsersInCall] = useState([]); // Lista de usuários na chamada
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
   const socket = useRef(null);
 
-  // Função para criar o peer
+  useEffect(() => {
+    // Simulando usuários entrando na chamada
+    const newUsers = ["Outro Usuário", "Você"];
+    setUsersInCall(newUsers);
+  }, [setUsersInCall]);
   const createPeer = useCallback((initiator) => {
     const peerInstance = new Peer({
       initiator,
@@ -35,10 +40,9 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     });
 
     peer.current = peerInstance;
-  }, [setUsersInCall]);
+  }, []);
 
-  // Entrar no canal de voz ao clicar na aba
-  const joinChannel = async () => {
+  const startCall = async () => {
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
@@ -73,7 +77,6 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     setUsersInCall(['Você']); // Adiciona o usuário atual na lista de usuários
   };
 
-  // Sair do canal de voz
   const endCall = () => {
     if (peer.current) {
       peer.current.destroy();
@@ -87,7 +90,6 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     setUsersInCall([]); // Reseta os usuários na chamada
   };
 
-  // Quando alguém entra no canal
   const handleIncomingCall = useCallback(async (data) => {
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
@@ -100,10 +102,9 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
 
     peer.current.signal(data);
     setIsInCall(true);
-    setUsersInCall(prevUsers => [...prevUsers, 'Outro Usuário']); // Adiciona o outro usuário
-  }, [createPeer, setUsersInCall]);
+    setUsersInCall(['Outro Usuário']); // Adiciona o outro usuário ao iniciar a chamada
+  }, [createPeer]);
 
-  // Efeito que se ativa ao entrar no canal
   useEffect(() => {
     if (!socket.current) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
@@ -126,15 +127,11 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
       };
     }
 
-    // Join the channel on mount
-    joinChannel(); // Aqui entra no canal automaticamente
-
     return () => {
       if (socket.current) {
         socket.current.close();
         socket.current = null;
       }
-      endCall(); // Sair do canal ao desmontar o componente
     };
   }, [handleIncomingCall]);
 
@@ -142,7 +139,6 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     <div className="p-6">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
 
-      {/* Mostrar se estiver em uma chamada */}
       {isInCall && (
         <div className="bg-green-500 text-white p-4 rounded-md">
           <FaPhoneAlt /> Você está em uma chamada!
@@ -150,22 +146,26 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
       )}
 
       <div className="mt-4">
-        {/* Mostrar usuários conectados */}
-        {isInCall && usersInCall.length > 0 ? (
-          <div>
+        {isInCall && (
+          <div className="flex flex-col items-start space-y-4">
             {usersInCall.map((user, index) => (
-              <div key={index} className="flex items-center gap-4 mt-2">
-                <FaUserCircle className="text-gray-700 w-6 h-6" />
+              <div key={index} className="flex items-center space-x-2">
+                <FaUserCircle size={24} />
                 <span>{user}</span>
               </div>
             ))}
           </div>
-        ) : (
-          <p>Nenhum usuário conectado ainda</p>
         )}
       </div>
 
-      {/* Sair do canal */}
+      {!isInCall && (
+        <div>
+          <button onClick={startCall} className="bg-blue-500 text-white p-3 rounded-md">
+            Entrar no Canal
+          </button>
+        </div>
+      )}
+
       {isInCall && (
         <button onClick={endCall} className="bg-red-500 text-white p-2 mt-4 rounded-md">
           Sair do Canal
