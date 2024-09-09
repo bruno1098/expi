@@ -1,168 +1,128 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { FaPhoneAlt } from "react-icons/fa";
+import Peer from 'simple-peer';
 
 const Canais = () => {
   const [isInCall, setIsInCall] = useState(false);
-  const [isInConversation, setIsInConversation] = useState(false); 
+  const [isInConversation, setIsInConversation] = useState(false);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
-  const peerConnection = useRef(null);
-  const socket = useRef(null); 
-  const iceCandidateQueue = useRef([]); 
+  const peer = useRef(null);
+  const socket = useRef(null);
 
-  const handleAnswer = useCallback(async (answer) => {
-    if (peerConnection.current) {
-      if (peerConnection.current.signalingState === "have-local-offer") {
-        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
-        
-        // Agora que a remoteDescription foi definida, processar a fila de candidatos
-        while (iceCandidateQueue.current.length > 0) {
-          const candidate = iceCandidateQueue.current.shift();
-          if (candidate) {
-            await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
-          }
-        }
-      } else {
-        console.log(`Estado de sinalização não permite setRemoteDescription: ${peerConnection.current.signalingState}`);
+  const createPeer = useCallback((initiator) => {
+    const p = new Peer({
+      initiator,
+      trickle: false,
+      stream: localAudioRef.current.srcObject // Passa o áudio local para o peer
+    });
+
+    // Recebe o sinal e envia através do WebSocket
+    p.on('signal', (data) => {
+      socket.current.send(JSON.stringify(data));
+    });
+
+    // Quando o stream remoto for recebido
+    p.on('stream', (stream) => {
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream;
       }
-    }
-  }, []);
-  
-  const handleICECandidate = useCallback(async (candidate) => {
-    if (candidate) {
-      if (peerConnection.current && peerConnection.current.remoteDescription && peerConnection.current.remoteDescription.type !== '') {
-        await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
-      } else {
-        iceCandidateQueue.current.push(candidate);
-        console.log('Candidato ICE enfileirado.');
-      }
-    }
+      setIsInConversation(true); // Outro usuário entrou na chamada
+    });
+
+    p.on('close', () => {
+      endCall();
+    });
+
+    peer.current = p;
   }, []);
 
-  const createPeerConnection = useCallback(async () => {
-    if (!peerConnection.current) {
-      const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-      peerConnection.current = new RTCPeerConnection(configuration);
-  
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (localAudioRef.current) {
-        localAudioRef.current.srcObject = localStream;
-      }
-  
-      localStream.getTracks().forEach((track) => {
-        peerConnection.current.addTrack(track, localStream);
-      });
-  
-      peerConnection.current.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.current?.send(JSON.stringify({
-            type: 'ice-candidate',
-            candidate: event.candidate
-          }));
-        }
-      };
-  
-      peerConnection.current.ontrack = (event) => {
-        const [remoteStream] = event.streams;
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = remoteStream;
-        }
-        setIsInConversation(true);
-      };
-  
-      setIsInCall(true);
-    }
-  }, []);
-
+  // Iniciar uma chamada, enviando uma oferta
   const startCall = async () => {
-    await createPeerConnection();
-    socket.current = new WebSocket('ws://localhost:8080');
-
-    if (peerConnection.current) {
-      const offer = await peerConnection.current.createOffer();
-      await peerConnection.current.setLocalDescription(offer);
-
-      socket.current.send(JSON.stringify({
-        type: 'offer',
-        offer
-      }));
+    // Obtém o stream local de áudio
+    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (localAudioRef.current) {
+      localAudioRef.current.srcObject = localStream;
     }
+    
+    // Configura o WebSocket
+    socket.current = new WebSocket('ws://localhost:8080');
+    socket.current.onopen = () => {
+      console.log('Conexão WebSocket estabelecida');
+    };
+
+    // Ao receber uma mensagem do WebSocket
+    socket.current.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (peer.current) {
+        peer.current.signal(data); // Passa o sinal para o peer
+      }
+    };
+
+    socket.current.onclose = () => {
+      console.log('WebSocket desconectado');
+      endCall();
+    };
+
+    // Cria o peer como iniciador
+    createPeer(true);
+
+    setIsInCall(true);
   };
 
   const endCall = () => {
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-      setIsInCall(false);
-      setIsInConversation(false);
+    if (peer.current) {
+      peer.current.destroy();
+      peer.current = null;
     }
+    setIsInCall(false);
+    setIsInConversation(false);
   };
 
-  const handleOffer = useCallback(async (offer) => {
-    if (!peerConnection.current) {
-      await createPeerConnection();
+  // Ao receber uma oferta de chamada
+  const handleIncomingCall = async () => {
+    // Obtém o stream local de áudio
+    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (localAudioRef.current) {
+      localAudioRef.current.srcObject = localStream;
     }
 
-    if (peerConnection.current.signalingState === "stable" || peerConnection.current.signalingState === "have-local-offer") {
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConnection.current.createAnswer();
-      await peerConnection.current.setLocalDescription(answer);
+    // Configura o WebSocket
+    socket.current = new WebSocket('ws://localhost:8080');
+    socket.current.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (peer.current) {
+        peer.current.signal(data); // Passa o sinal para o peer
+      }
+    };
 
-      socket.current.send(JSON.stringify({
-        type: 'answer',
-        answer
-      }));
-    } else {
-      console.log('Estado de sinalização não estável:', peerConnection.current.signalingState);
-    }
-  }, [createPeerConnection]);
+    // Cria o peer sem ser o iniciador
+    createPeer(false);
+    setIsInCall(true);
+  };
 
   useEffect(() => {
+    // Configura o socket para lidar com chamadas recebidas
     const createWebSocket = () => {
       socket.current = new WebSocket('ws://localhost:8080');
-
       socket.current.onopen = () => {
-        console.log('Conexão WebSocket estabelecida');
-      };
-
-      socket.current.onclose = () => {
-        console.log('WebSocket fechado, tentando reconectar...');
-        setTimeout(() => {
-          createWebSocket();
-        }, 3000);
+        console.log('Esperando por chamadas...');
       };
 
       socket.current.onmessage = (message) => {
-        if (typeof message.data === 'object' && message.data instanceof Blob) {
-          console.log('Áudio recebido:', message.data);
-        } else {
-          try {
-            const data = JSON.parse(message.data);
-            console.log('Mensagem JSON recebida:', data);
-      
-            if (data.type === 'offer') {
-              handleOffer(data.offer);
-            } else if (data.type === 'answer') {
-              handleAnswer(data.answer);
-            } else if (data.type === 'ice-candidate') {
-              handleICECandidate(data.candidate);
-            }
-          } catch (error) {
-            console.error('Erro ao analisar mensagem JSON:', error);
-          }
-        }
+        handleIncomingCall(); // Chamada recebida
       };
     };
 
     createWebSocket();
-
+    
     return () => {
-      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        socket.current.send(JSON.stringify(onmessage));
+      if (socket.current) {
+        socket.current.close();
       }
     };
-  }, [handleOffer, handleAnswer, handleICECandidate]);
+  }, [handleIncomingCall]);
 
   return (
     <div className="flex-1 flex flex-col p-6 overflow-auto">
@@ -183,27 +143,10 @@ const Canais = () => {
           </Avatar>
           <span className="text-lg">Canal de Voz 1</span>
         </div>
-        <div className="flex items-center gap-4 p-3 bg-muted rounded-md hover:bg-muted-hover cursor-pointer">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src="/icons/channel2.png" alt="Channel 2" />
-            <AvatarFallback>C2</AvatarFallback>
-          </Avatar>
-          <span className="text-lg">Canal de Voz 2</span>
-        </div>
       </div>
 
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />
-
-      {isInCall && (
-        <div className="flex items-center mt-4">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src="/icons/user_active.png" alt="Você está em chamada" />
-            <AvatarFallback>Você</AvatarFallback>
-          </Avatar>
-          <span className="ml-2 text-lg">Você está na chamada</span>
-        </div>
-      )}
 
       {isInConversation && (
         <div className="flex items-center mt-4">
