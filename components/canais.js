@@ -82,11 +82,25 @@ const Canais = () => {
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
     }
-
-    createPeer(false);
-    peer.current.signal(data);
+  
+    if (!peer.current || peer.current.destroyed) {
+      createPeer(false);  // Apenas cria o peer se ele não foi destruído
+    }
+  
+    peer.current.signal(data);  // Certifique-se de chamar o signal apenas se o peer existir
     setIsInCall(true);
   }, [createPeer]);
+  
+  socket.current.onmessage = (message) => {
+    const data = JSON.parse(message.data);
+    
+    if (peer.current && !peer.current.destroyed) {
+      peer.current.signal(data);  // Certifique-se de que o peer não foi destruído antes de sinalizar
+    } else {
+      console.log("Peer já foi destruído, sinalização ignorada.");
+    }
+  };
+  
 
   useEffect(() => {
     socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
