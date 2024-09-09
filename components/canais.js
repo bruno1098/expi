@@ -9,34 +9,30 @@ const Canais = () => {
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
   const socket = useRef(null);
-  const messageQueue = useRef([]); // Fila de mensagens enquanto o WebSocket não está pronto
 
-  const sendMessage = (message) => {
-    if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-      socket.current.send(JSON.stringify(message));
-    } else {
-      // Armazenar na fila se o WebSocket ainda não estiver pronto
-      messageQueue.current.push(message);
-    }
-  };
-
+  // Função para criar o peer
   const createPeer = useCallback((initiator) => {
     const peerInstance = new Peer({
       initiator,
       trickle: false,
-      stream: localAudioRef.current.srcObject,
+      stream: localAudioRef.current.srcObject, // Usa o áudio local
     });
 
+    // Envia sinal ao outro peer
     peerInstance.on('signal', (data) => {
-      sendMessage(data); // Usar a função de envio com checagem
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+        socket.current.send(JSON.stringify(data));
+      }
     });
 
+    // Recebe stream remoto
     peerInstance.on('stream', (stream) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
       }
     });
 
+    // Quando a conexão fecha
     peerInstance.on('close', () => {
       leaveChannel();
     });
@@ -44,50 +40,51 @@ const Canais = () => {
     peer.current = peerInstance;
   }, []);
 
+  // Função para entrar no canal
   const joinChannel = async () => {
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
     }
 
+    // Configura WebSocket
     if (!socket.current) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
-        setIsConnected(true);
-
-        // Enviar todas as mensagens acumuladas na fila
-        while (messageQueue.current.length > 0) {
-          const queuedMessage = messageQueue.current.shift();
-          sendMessage(queuedMessage);
-        }
+        setIsConnected(true); // Marca como conectado
       };
 
+      // Recebe mensagens via WebSocket
       socket.current.onmessage = (message) => {
         const data = JSON.parse(message.data);
         if (data.type === "user-joined") {
-          setUsersInChannel(prevUsers => [...prevUsers, data.username]);
+          setUsersInChannel(prevUsers => [...prevUsers, data.username]); // Adiciona usuário ao canal
         } else if (data.type === "signal") {
           if (peer.current) {
-            peer.current.signal(data.signal);
+            peer.current.signal(data.signal); // Processa o sinal do outro peer
           }
         }
       };
 
+      // Quando o WebSocket fecha
       socket.current.onclose = () => {
         console.log('WebSocket desconectado');
         leaveChannel();
       };
 
+      // Trata erros
       socket.current.onerror = (error) => {
         console.error('Erro no WebSocket:', error);
       };
     }
 
+    // Cria o peer com o iniciador definido
     createPeer(true);
   };
 
+  // Função para sair do canal
   const leaveChannel = () => {
     if (peer.current) {
       peer.current.destroy();
@@ -98,14 +95,15 @@ const Canais = () => {
       socket.current = null;
     }
     setIsConnected(false);
-    setUsersInChannel([]);
+    setUsersInChannel([]); // Limpa os usuários
   };
 
+  // Usa o efeito para entrar automaticamente no canal ao carregar o componente
   useEffect(() => {
     joinChannel();
 
     return () => {
-      leaveChannel();
+      leaveChannel(); // Sai do canal ao desmontar o componente
     };
   }, [createPeer]);
 
