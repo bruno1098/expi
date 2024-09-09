@@ -453,8 +453,8 @@ export function Chat() {
 
 
        <div className="flex-1 flex flex-col">
-        {selectedTab === "voicechat" ? (
-          // Exibir usuários no meio da tela quando a aba de voicechat estiver selecionada
+       {selectedTab === "voicechat" ? (
+          // Exibir os ícones dos usuários no meio da tela
           <div className="flex flex-col items-center justify-center h-full">
             <h2 className="text-2xl font-bold mb-4">Canais de Voz</h2>
             {usersInCall.length > 0 ? (
