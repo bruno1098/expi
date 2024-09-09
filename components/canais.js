@@ -1,20 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { FaPhoneAlt, FaUserCircle } from "react-icons/fa";
+import { FaPhoneAlt } from "react-icons/fa";
 import Peer from 'simple-peer';
 
-const Canais = ({ usersInCall, setUsersInCall }) => {
+const Canais = () => {
   const [isInCall, setIsInCall] = useState(false);
-  const [usersInCall, setUsersInCall] = useState([]); // Lista de usuários na chamada
+  const [isInConversation, setIsInConversation] = useState(false);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
   const socket = useRef(null);
 
-  useEffect(() => {
-    // Simulando usuários entrando na chamada
-    const newUsers = ["Outro Usuário", "Você"];
-    setUsersInCall(newUsers);
-  }, [setUsersInCall]);
   const createPeer = useCallback((initiator) => {
     const peerInstance = new Peer({
       initiator,
@@ -32,7 +27,7 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
       }
-      setUsersInCall(prevUsers => [...prevUsers, 'Outro Usuário']); // Adiciona outro usuário na chamada
+      setIsInConversation(true);
     });
 
     peerInstance.on('close', () => {
@@ -74,7 +69,6 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
 
     createPeer(true);
     setIsInCall(true);
-    setUsersInCall(['Você']); // Adiciona o usuário atual na lista de usuários
   };
 
   const endCall = () => {
@@ -87,7 +81,7 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
       socket.current = null;
     }
     setIsInCall(false);
-    setUsersInCall([]); // Reseta os usuários na chamada
+    setIsInConversation(false);
   };
 
   const handleIncomingCall = useCallback(async (data) => {
@@ -97,12 +91,11 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
     }
 
     if (!peer.current || peer.current.destroyed) {
-      createPeer(false);
+      createPeer(false);  // Apenas cria o peer se ele não foi destruído
     }
 
-    peer.current.signal(data);
+    peer.current.signal(data);  // Certifique-se de chamar o signal apenas se o peer existir
     setIsInCall(true);
-    setUsersInCall(['Outro Usuário']); // Adiciona o outro usuário ao iniciar a chamada
   }, [createPeer]);
 
   useEffect(() => {
@@ -145,30 +138,23 @@ const Canais = ({ usersInCall, setUsersInCall }) => {
         </div>
       )}
 
-      <div className="mt-4">
-        {isInCall && (
-          <div className="flex flex-col items-start space-y-4">
-            {usersInCall.map((user, index) => (
-              <div key={index} className="flex items-center space-x-2">
-                <FaUserCircle size={24} />
-                <span>{user}</span>
-              </div>
-            ))}
+      <div>
+        {!isInCall && (
+          <button onClick={startCall} className="bg-blue-500 text-white p-3 rounded-md">
+            Iniciar Chamada
+          </button>
+        )}
+
+        {isInConversation && (
+          <div className="mt-4">
+            <span>Outra pessoa entrou na chamada</span>
           </div>
         )}
       </div>
 
-      {!isInCall && (
-        <div>
-          <button onClick={startCall} className="bg-blue-500 text-white p-3 rounded-md">
-            Entrar no Canal
-          </button>
-        </div>
-      )}
-
       {isInCall && (
         <button onClick={endCall} className="bg-red-500 text-white p-2 mt-4 rounded-md">
-          Sair do Canal
+          Encerrar Chamada
         </button>
       )}
 
