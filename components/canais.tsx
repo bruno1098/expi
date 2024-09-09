@@ -1,6 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { FaPhoneAlt } from "react-icons/fa"; // Ícone para chamada ativa
+import { FaPhoneAlt } from "react-icons/fa";
 
 const Canais = () => {
   const [isInCall, setIsInCall] = useState(false);
@@ -8,46 +8,109 @@ const Canais = () => {
   const localAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
+  const socket = useRef<WebSocket | null>(null); // WebSocket para sinalização
+
+  useEffect(() => {
+    // Conectar ao WebSocket no Heroku
+    socket.current = new WebSocket('wss://seu-websocket-app.herokuapp.com');
+    
+    // Quando receber mensagens do WebSocket
+    socket.current.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (data.type === 'offer') {
+        handleOffer(data.offer);
+      } else if (data.type === 'answer') {
+        handleAnswer(data.answer);
+      } else if (data.type === 'ice-candidate') {
+        handleICECandidate(data.candidate);
+      }
+    };
+
+    return () => {
+      if (socket.current) {
+        socket.current.close();
+      }
+    };
+  }, []);
+
+  // Função para lidar com ofertas WebRTC recebidas
+  const handleOffer = async (offer: RTCSessionDescriptionInit) => {
+    if (!peerConnection.current) {
+      await createPeerConnection();
+    }
   
-  const startCall = async () => {
-    const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(offer));
+  
+    const answer = await peerConnection.current?.createAnswer();
+    await peerConnection.current?.setLocalDescription(answer);
+  
+    socket.current?.send(JSON.stringify({
+      type: 'answer',
+      answer
+    }));
+  };
+  
 
-    peerConnection.current = new RTCPeerConnection(configuration);
+  // Função para lidar com respostas WebRTC recebidas
+  const handleAnswer = async (answer: RTCSessionDescriptionInit) => {
+    await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(answer));
+  };
 
-    try {
+  // Função para lidar com candidatos ICE recebidos
+  const handleICECandidate = async (candidate: RTCIceCandidateInit | undefined) => {
+    await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
+  };
+
+  const createPeerConnection = async () => {
+    if (!peerConnection.current) {
+      const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+      peerConnection.current = new RTCPeerConnection(configuration);
+  
       const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (localAudioRef.current) {
         localAudioRef.current.srcObject = localStream;
       }
-
+  
       localStream.getTracks().forEach((track) => {
-        if (peerConnection.current) {
-          peerConnection.current.addTrack(track, localStream);
-        }
+        peerConnection.current?.addTrack(track, localStream);
       });
-
-      if (peerConnection.current) {
-        peerConnection.current.ontrack = (event) => {
-          const [remoteStream] = event.streams;
-          if (remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = remoteStream;
-          }
-          setIsInConversation(true); // Alguém entrou na chamada
-        };
-
-        peerConnection.current.onicecandidate = (event) => {
-          if (event.candidate) {
-            // Troca de candidatos ICE via servidor de sinalização
-            // Enviar o ICE candidate para o outro peer via servidor de WebSocket
-          }
-        };
-      }
-
-      setIsInCall(true); // Atualiza o estado para indicar que está em uma chamada
-    } catch (error) {
-      console.error("Erro ao iniciar a chamada de voz:", error);
+  
+      peerConnection.current.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.current?.send(JSON.stringify({
+            type: 'ice-candidate',
+            candidate: event.candidate
+          }));
+        }
+      };
+  
+      peerConnection.current.ontrack = (event) => {
+        const [remoteStream] = event.streams;
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream;
+        }
+        setIsInConversation(true); // Outro usuário entrou na chamada
+      };
+  
+      setIsInCall(true);
     }
   };
+  
+  // Inicia uma chamada, enviando uma oferta via WebSocket
+  const startCall = async () => {
+    await createPeerConnection();
+  
+    if (peerConnection.current) {
+      const offer = await peerConnection.current.createOffer();
+      await peerConnection.current.setLocalDescription(offer);
+  
+      socket.current?.send(JSON.stringify({
+        type: 'offer',
+        offer
+      }));
+    }
+  };
+  
 
   const endCall = () => {
     if (peerConnection.current) {
