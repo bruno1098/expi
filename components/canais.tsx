@@ -11,23 +11,56 @@ const Canais = () => {
   const socket = useRef<WebSocket | null>(null); // WebSocket para sinalização
 
   useEffect(() => {
-    // Conectar ao WebSocket no Heroku
-    socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com');
+    const createWebSocket = () => {
+      socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com');
+      
+      socket.current.onopen = () => {
+        console.log('Conexão WebSocket estabelecida');
+      };
+      
+      socket.current.onclose = () => {
+        console.log('WebSocket fechado, tentando reconectar...');
+        setTimeout(() => {
+          createWebSocket();  // Tenta reconectar após um tempo
+        }, 3000);
+      };
   
-    // Quando receber mensagens do WebSocket
-    socket.current.onmessage = (message) => {
-      const data = JSON.parse(message.data);
-      if (data.type === 'offer') {
-        handleOffer(data.offer);
-      } else if (data.type === 'answer') {
-        handleAnswer(data.answer);
-      } else if (data.type === 'ice-candidate') {
-        handleICECandidate(data.candidate);
-      } else if (data.type === 'users-count') {
-        // Exibe a quantidade de usuários conectados
-        console.log(`Usuários conectados: ${data.count}`);
-      }
+      socket.current.onmessage = (message) => {
+        const data = JSON.parse(message.data);
+        console.log('Mensagem recebida:', data);
+  
+        // Suas lógicas para ofertas, respostas e ICE candidates
+        if (data.type === 'offer') {
+          handleOffer(data.offer);
+        } else if (data.type === 'answer') {
+          handleAnswer(data.answer);
+        } else if (data.type === 'ice-candidate') {
+          handleICECandidate(data.candidate);
+        }
+      };
     };
+    const sendMessage = (message: any) => {
+        if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+          socket.current.send(JSON.stringify(message));
+        } else {
+          console.log('WebSocket não está aberto');
+        }
+      };
+      
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+          if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+            socket.current.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 25000);  // Envia um ping a cada 25 segundos
+      
+        return () => clearInterval(interval);
+      }, []);
+      
+  
+    // Chama a função para criar o WebSocket na inicialização
+    createWebSocket();
   
     return () => {
       if (socket.current) {
@@ -35,6 +68,7 @@ const Canais = () => {
       }
     };
   }, []);
+  
   
 
   // Função para lidar com ofertas WebRTC recebidas
