@@ -9,8 +9,9 @@ const Canais = () => {
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const socket = useRef<WebSocket | null>(null); // WebSocket para sinalização
+  const mediaRecorder = useRef<MediaRecorder | null>(null); // Para gravar o áudio local
+  const audioChunks = useRef<any[]>([]); // Para armazenar pedaços do áudio
 
-  
   // Função para lidar com ofertas WebRTC recebidas
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
     if (!peerConnection.current) {
@@ -35,7 +36,9 @@ const Canais = () => {
 
   // Função para lidar com candidatos ICE recebidos
   const handleICECandidate = useCallback(async (candidate: RTCIceCandidateInit | undefined) => {
-    await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
+    if (candidate) {
+      await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
+    }
   }, []);
 
   // Criar a conexão WebRTC
@@ -70,14 +73,31 @@ const Canais = () => {
         setIsInConversation(true); // Outro usuário entrou na chamada
       };
 
+      // Iniciar a gravação e envio do áudio
+      startRecording(localStream);
+
       setIsInCall(true);
     }
   }, []);
 
+  // Função para iniciar a gravação do áudio e enviar ao servidor
+  const startRecording = (stream: MediaStream) => {
+    mediaRecorder.current = new MediaRecorder(stream);
+    mediaRecorder.current.ondataavailable = (event) => {
+      audioChunks.current.push(event.data);
+
+      // Enviar o áudio para o servidor WebSocket
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+        socket.current.send(event.data);
+      }
+    };
+
+    mediaRecorder.current.start(1000); // Gravar e enviar a cada 1000ms (1 segundo)
+  };
+
   useEffect(() => {
     const createWebSocket = () => {
-      socket.current = new WebSocket('ws://localhost:8080');
-      
+      socket.current = new WebSocket('ws://localhost:8080'); // Substituir pela URL do seu servidor WebSocket
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
@@ -87,7 +107,7 @@ const Canais = () => {
         console.log('WebSocket fechado, tentando reconectar...');
         setTimeout(() => {
           createWebSocket();  // Tenta reconectar após um tempo
-        }, 3000);``
+        }, 3000);
       };
 
       socket.current.onmessage = (message) => {
@@ -107,19 +127,18 @@ const Canais = () => {
     createWebSocket();
 
     return () => {
-        if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-            socket.current.send(JSON.stringify(onmessage));
-          } else {
-            console.log('WebSocket ainda está conectando ou já foi fechado.');
-          }
-          
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+        socket.current.send(JSON.stringify(onmessage));
+      } else {
+        console.log('WebSocket ainda está conectando ou já foi fechado.');
+      }
     };
   }, [handleOffer, handleAnswer, handleICECandidate]);
 
   // Inicia uma chamada, enviando uma oferta via WebSocket
   const startCall = async () => {
     await createPeerConnection();
-    socket.current = new WebSocket('ws://localhost:8080');
+    socket.current = new WebSocket('ws://localhost:8080'); // Substituir pela URL do seu servidor WebSocket
 
     if (peerConnection.current) {
       const offer = await peerConnection.current.createOffer();
@@ -132,13 +151,17 @@ const Canais = () => {
     }
   };
 
-  
   const endCall = () => {
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
       setIsInCall(false);
       setIsInConversation(false);
+    }
+
+    if (mediaRecorder.current) {
+      mediaRecorder.current.stop(); // Para a gravação do áudio
+      mediaRecorder.current = null;
     }
   };
 
@@ -167,13 +190,6 @@ const Canais = () => {
             <AvatarFallback>C2</AvatarFallback>
           </Avatar>
           <span className="text-lg">Canal de Voz 2</span>
-        </div>
-        <div className="flex items-center gap-4 p-3 bg-muted rounded-md hover:bg-muted-hover cursor-pointer">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src="/icons/channel3.png" alt="Channel 3" />
-            <AvatarFallback>C3</AvatarFallback>
-          </Avatar>
-          <span className="text-lg">Canal de Voz 3</span>
         </div>
       </div>
 
