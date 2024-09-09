@@ -18,8 +18,10 @@ const Canais = () => {
     });
 
     peerInstance.on('signal', (data) => {
-      if (socket.current) {
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         socket.current.send(JSON.stringify(data));
+      } else {
+        console.error("WebSocket não está pronto para enviar dados");
       }
     });
 
