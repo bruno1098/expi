@@ -43,7 +43,7 @@ const Canais = () => {
       localAudioRef.current.srcObject = localStream;
     }
 
-    socket.current = new WebSocket('wss://seu-websocket-url');
+    socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
 
     socket.current.onopen = () => {
       console.log('Conexão WebSocket estabelecida');
@@ -52,7 +52,7 @@ const Canais = () => {
     socket.current.onmessage = (message) => {
       const data = JSON.parse(message.data);
       if (peer.current) {
-        peer.current.signal(data);
+        peer.current.signal(data);``
       }
     };
 
@@ -89,7 +89,7 @@ const Canais = () => {
   }, [createPeer]);
 
   useEffect(() => {
-    socket.current = new WebSocket('wss://seu-websocket-url');
+    socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
 
     socket.current.onmessage = (message) => {
       const data = JSON.parse(message.data);
