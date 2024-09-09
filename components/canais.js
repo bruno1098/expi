@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { FaPhoneAlt } from "react-icons/fa";
+import { FaPhoneAlt, FaUserCircle } from "react-icons/fa";
 import Peer from 'simple-peer';
 
 const Canais = () => {
   const [isInCall, setIsInCall] = useState(false);
-  const [isInConversation, setIsInConversation] = useState(false);
+  const [usersInCall, setUsersInCall] = useState([]); // Lista de usuários na chamada
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
@@ -27,7 +27,7 @@ const Canais = () => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
       }
-      setIsInConversation(true);
+      setUsersInCall(prevUsers => [...prevUsers, 'Outro Usuário']); // Adiciona outro usuário na chamada
     });
 
     peerInstance.on('close', () => {
@@ -69,6 +69,7 @@ const Canais = () => {
 
     createPeer(true);
     setIsInCall(true);
+    setUsersInCall(['Você']); // Adiciona o usuário atual na lista de usuários
   };
 
   const endCall = () => {
@@ -81,7 +82,7 @@ const Canais = () => {
       socket.current = null;
     }
     setIsInCall(false);
-    setIsInConversation(false);
+    setUsersInCall([]); // Reseta os usuários na chamada
   };
 
   const handleIncomingCall = useCallback(async (data) => {
@@ -91,11 +92,12 @@ const Canais = () => {
     }
 
     if (!peer.current || peer.current.destroyed) {
-      createPeer(false);  // Apenas cria o peer se ele não foi destruído
+      createPeer(false);
     }
 
-    peer.current.signal(data);  // Certifique-se de chamar o signal apenas se o peer existir
+    peer.current.signal(data);
     setIsInCall(true);
+    setUsersInCall(['Outro Usuário']); // Adiciona o outro usuário ao iniciar a chamada
   }, [createPeer]);
 
   useEffect(() => {
@@ -138,23 +140,30 @@ const Canais = () => {
         </div>
       )}
 
-      <div>
-        {!isInCall && (
-          <button onClick={startCall} className="bg-blue-500 text-white p-3 rounded-md">
-            Iniciar Chamada
-          </button>
-        )}
-
-        {isInConversation && (
-          <div className="mt-4">
-            <span>Outra pessoa entrou na chamada</span>
+      <div className="mt-4">
+        {isInCall && (
+          <div className="flex flex-col items-start space-y-4">
+            {usersInCall.map((user, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <FaUserCircle size={24} />
+                <span>{user}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
+      {!isInCall && (
+        <div>
+          <button onClick={startCall} className="bg-blue-500 text-white p-3 rounded-md">
+            Entrar no Canal
+          </button>
+        </div>
+      )}
+
       {isInCall && (
         <button onClick={endCall} className="bg-red-500 text-white p-2 mt-4 rounded-md">
-          Encerrar Chamada
+          Sair do Canal
         </button>
       )}
 
