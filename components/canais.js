@@ -9,6 +9,16 @@ const Canais = () => {
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
   const socket = useRef(null);
+  const messageQueue = useRef([]); // Fila de mensagens enquanto o WebSocket não está pronto
+
+  const sendMessage = (message) => {
+    if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+      socket.current.send(JSON.stringify(message));
+    } else {
+      // Armazenar na fila se o WebSocket ainda não estiver pronto
+      messageQueue.current.push(message);
+    }
+  };
 
   const createPeer = useCallback((initiator) => {
     const peerInstance = new Peer({
@@ -18,11 +28,7 @@ const Canais = () => {
     });
 
     peerInstance.on('signal', (data) => {
-      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        socket.current.send(JSON.stringify(data));
-      } else {
-        console.error("WebSocket não está pronto para enviar dados");
-      }
+      sendMessage(data); // Usar a função de envio com checagem
     });
 
     peerInstance.on('stream', (stream) => {
@@ -50,6 +56,12 @@ const Canais = () => {
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
         setIsConnected(true);
+
+        // Enviar todas as mensagens acumuladas na fila
+        while (messageQueue.current.length > 0) {
+          const queuedMessage = messageQueue.current.shift();
+          sendMessage(queuedMessage);
+        }
       };
 
       socket.current.onmessage = (message) => {
