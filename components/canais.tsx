@@ -111,17 +111,29 @@ const Canais = () => {
       };
 
       socket.current.onmessage = (message) => {
-        const data = JSON.parse(message.data);
-        console.log('Mensagem recebida:', data);
-
-        if (data.type === 'offer') {
-          handleOffer(data.offer);
-        } else if (data.type === 'answer') {
-          handleAnswer(data.answer);
-        } else if (data.type === 'ice-candidate') {
-          handleICECandidate(data.candidate);
+        // Verifique se a mensagem é um blob (áudio)
+        if (typeof message.data === 'object' && message.data instanceof Blob) {
+          console.log('Áudio recebido como Blob:', message.data);
+          // Aqui você pode fazer o que quiser com o blob recebido, como salvá-lo ou processá-lo
+        } else {
+          // Trata as mensagens de sinalização (WebRTC) como JSON
+          try {
+            const data = JSON.parse(message.data);
+            console.log('Mensagem JSON recebida:', data);
+      
+            if (data.type === 'offer') {
+              handleOffer(data.offer);
+            } else if (data.type === 'answer') {
+              handleAnswer(data.answer);
+            } else if (data.type === 'ice-candidate') {
+              handleICECandidate(data.candidate);
+            }
+          } catch (error) {
+            console.error('Erro ao analisar mensagem JSON:', error);
+          }
         }
       };
+      
     };
 
     createWebSocket();
