@@ -76,7 +76,7 @@ const Canais = () => {
 
   useEffect(() => {
     const createWebSocket = () => {
-      socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com');
+      socket.current = new WebSocket('ws://localhost:8080');
       
 
       socket.current.onopen = () => {
