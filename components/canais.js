@@ -12,30 +12,30 @@ const Canais = () => {
   const socket = useRef(null);
 
   const createPeer = useCallback((initiator) => {
-    const p = new Peer({
+    const peerInstance = new Peer({
       initiator,
       trickle: false,
       stream: localAudioRef.current.srcObject // Passa o áudio local para o peer
     });
-
+  
     // Recebe o sinal e envia através do WebSocket
-    p.on('signal', (data) => {
+    peerInstance.on('signal', (data) => {
       socket.current.send(JSON.stringify(data));
     });
-
+  
     // Quando o stream remoto for recebido
-    p.on('stream', (stream) => {
+    peerInstance.on('stream', (stream) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
       }
       setIsInConversation(true); // Outro usuário entrou na chamada
     });
-
-    p.on('close', () => {
+  
+    peerInstance.on('close', () => {
       endCall();
     });
-
-    peer.current = p;
+  
+    peer.current = peerInstance;
   }, []);
 
   // Iniciar uma chamada, enviando uma oferta
