@@ -44,7 +44,7 @@ const Canais = () => {
     }
 
     if (!socket.current) {
-      socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+      socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com');
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
@@ -100,7 +100,7 @@ const Canais = () => {
 
   useEffect(() => {
     if (!socket.current) {
-      socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+      socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com');
       
       socket.current.onopen = () => {
         console.log('Esperando por chamadas...');
