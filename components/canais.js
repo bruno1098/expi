@@ -47,7 +47,7 @@ const Canais = () => {
     }
     
     // Configura o WebSocket
-    socket.current = new WebSocket('ws://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+    socket.current = new WebSocket('wss://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
 
     socket.current.onopen = () => {
       console.log('Conexão WebSocket estabelecida');
@@ -90,7 +90,7 @@ const Canais = () => {
     }
 
     // Configura o WebSocket
-   socket.current = new WebSocket('ws://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+   socket.current = new WebSocket('wss://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
 
     socket.current.onmessage = (message) => {
       const data = JSON.parse(message.data);
@@ -107,7 +107,7 @@ const Canais = () => {
   useEffect(() => {
     // Configura o socket para lidar com chamadas recebidas
     const createWebSocket = () => {
-     socket.current = new WebSocket('ws://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+     socket.current = new WebSocket('wss://d33b-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
 
       socket.current.onopen = () => {
         console.log('Esperando por chamadas...');
