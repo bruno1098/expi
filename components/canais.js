@@ -103,20 +103,51 @@ const Canais = () => {
   
 
   useEffect(() => {
-    socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
-
-    socket.current.onmessage = (message) => {
-      const data = JSON.parse(message.data);
-      handleIncomingCall(data);
+    const createWebSocket = () => {
+      socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
+  
+      socket.current.onopen = () => {
+        console.log('WebSocket conectado');
+      };
+  
+      socket.current.onerror = (error) => {
+        console.error('Erro no WebSocket:', error);
+      };
+  
+      socket.current.onmessage = (message) => {
+        if (message && peer.current) {
+          const data = JSON.parse(message.data);
+          peer.current.signal(data);
+        } else {
+          console.log('Mensagem recebida, mas o peer não está disponível ou a mensagem é nula.');
+        }
+      };
+  
+      socket.current.onclose = () => {
+        console.log('WebSocket desconectado');
+      };
     };
-
+  
+    createWebSocket();
+  
     return () => {
       if (socket.current) {
         socket.current.close();
       }
     };
   }, [handleIncomingCall]);
-
+  
+  if (socket.current) {
+    socket.current.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (peer.current) {
+        peer.current.signal(data);
+      }
+    };
+  } else {
+    console.error('WebSocket não está inicializado.');
+  }
+  
   return (
     <div className="p-6">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
