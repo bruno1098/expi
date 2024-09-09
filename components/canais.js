@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaPhoneAlt, FaUserCircle } from "react-icons/fa";
 import Peer from 'simple-peer';
 
-const Canais = () => {
+const Canais = ({ usersInCall, setUsersInCall }) => {
   const [isInCall, setIsInCall] = useState(false);
   const [usersInCall, setUsersInCall] = useState([]); // Lista de usuários na chamada
   const localAudioRef = useRef(null);
@@ -10,6 +10,12 @@ const Canais = () => {
   const peer = useRef(null);
   const socket = useRef(null);
 
+  useEffect(() => {
+    // Simulando usuários entrando na chamada
+    const newUsers = ["Outro Usuário", "Você"];
+    setUsersInCall(newUsers);
+  }, [setUsersInCall]);
+  
   const createPeer = useCallback((initiator) => {
     const peerInstance = new Peer({
       initiator,
