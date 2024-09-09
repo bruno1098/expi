@@ -44,8 +44,7 @@ const Canais = () => {
     }
 
     if (!socket.current) {
-      socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com/ws');
-
+      socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
@@ -101,9 +100,8 @@ const Canais = () => {
 
   useEffect(() => {
     if (!socket.current) {
-      socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com/ws');
+      socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
 
-      
       socket.current.onopen = () => {
         console.log('Esperando por chamadas...');
       };
