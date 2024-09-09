@@ -12,8 +12,8 @@ const Canais = () => {
 
   useEffect(() => {
     // Conectar ao WebSocket no Heroku
-    socket.current = new WebSocket('wss://seu-websocket-app.herokuapp.com');
-    
+    socket.current = new WebSocket('wss://websocket-server-app.herokuapp.com');
+  
     // Quando receber mensagens do WebSocket
     socket.current.onmessage = (message) => {
       const data = JSON.parse(message.data);
@@ -23,15 +23,19 @@ const Canais = () => {
         handleAnswer(data.answer);
       } else if (data.type === 'ice-candidate') {
         handleICECandidate(data.candidate);
+      } else if (data.type === 'users-count') {
+        // Exibe a quantidade de usuários conectados
+        console.log(`Usuários conectados: ${data.count}`);
       }
     };
-
+  
     return () => {
       if (socket.current) {
         socket.current.close();
       }
     };
   }, []);
+  
 
   // Função para lidar com ofertas WebRTC recebidas
   const handleOffer = async (offer: RTCSessionDescriptionInit) => {
