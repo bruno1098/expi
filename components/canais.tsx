@@ -2,15 +2,13 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { FaPhoneAlt } from "react-icons/fa";
 
-const Canais = () => {
+const Canais = async () => {
   const [isInCall, setIsInCall] = useState(false);
   const [isInConversation, setIsInConversation] = useState(false); // Indica se a outra pessoa está conectada
   const localAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const socket = useRef<WebSocket | null>(null); // WebSocket para sinalização
-  const mediaRecorder = useRef<MediaRecorder | null>(null); // Para gravar o áudio local
-  const audioChunks = useRef<any[]>([]); // Para armazenar pedaços do áudio
 
   // Função para lidar com ofertas WebRTC recebidas
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
@@ -41,60 +39,50 @@ const Canais = () => {
     }
   }, []);
 
-  // Criar a conexão WebRTC
-  const createPeerConnection = useCallback(async () => {
-    if (!peerConnection.current) {
-      const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-      peerConnection.current = new RTCPeerConnection(configuration);
-
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (localAudioRef.current) {
-        localAudioRef.current.srcObject = localStream;
-      }
-
-      localStream.getTracks().forEach((track) => {
-        peerConnection.current?.addTrack(track, localStream);
-      });
-
-      peerConnection.current.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.current?.send(JSON.stringify({
-            type: 'ice-candidate',
-            candidate: event.candidate
-          }));
-        }
-      };
-
-      peerConnection.current.ontrack = (event) => {
-        const [remoteStream] = event.streams;
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = remoteStream;
-        }
-        setIsInConversation(true); // Outro usuário entrou na chamada
-      };
-
-      // Iniciar a gravação e envio do áudio
-      startRecording(localStream);
-
-      setIsInCall(true);
+  // Função para criar a conexão WebRTC e adicionar as tracks de áudio
+  const createPeerConnection = async () => {
+    const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    peerConnection.current = new RTCPeerConnection(configuration);
+  
+    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStream.getTracks().forEach((track) => {
+      peerConnection.current?.addTrack(track, localStream); // Verificação com `?.`
+    });
+  
+    // Definir o áudio local
+    if (localAudioRef.current) {
+      localAudioRef.current.srcObject = localStream;
     }
-  }, []);
-
-  // Função para iniciar a gravação do áudio e enviar ao servidor
-  const startRecording = (stream: MediaStream) => {
-    mediaRecorder.current = new MediaRecorder(stream);
-    mediaRecorder.current.ondataavailable = (event) => {
-      audioChunks.current.push(event.data);
-
-      // Enviar o áudio para o servidor WebSocket
-      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        socket.current.send(event.data);
+  
+    peerConnection.current.ontrack = (event) => {
+      const [remoteStream] = event.streams;
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
       }
     };
-
-    mediaRecorder.current.start(1000); // Gravar e enviar a cada 1000ms (1 segundo)
+  
+    peerConnection.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.current?.send(JSON.stringify({
+          type: 'ice-candidate',
+          candidate: event.candidate
+        }));
+      }
+    };
   };
-
+  
+  // Uso condicional em outros lugares:
+  if (peerConnection.current) {
+    // Aqui você pode acessar peerConnection.current de forma segura
+    const offer = await peerConnection.current.createOffer();
+    await peerConnection.current.setLocalDescription(offer);
+  
+    socket.current?.send(JSON.stringify({
+      type: 'offer',
+      offer
+    }));
+  }
+  
   useEffect(() => {
     const createWebSocket = () => {
       socket.current = new WebSocket('ws://localhost:8080'); // Substituir pela URL do seu servidor WebSocket
@@ -111,38 +99,29 @@ const Canais = () => {
       };
 
       socket.current.onmessage = (message) => {
-        // Verifique se a mensagem é um blob (áudio)
-        if (typeof message.data === 'object' && message.data instanceof Blob) {
-          console.log('Áudio recebido como Blob:', message.data);
-          // Aqui você pode fazer o que quiser com o blob recebido, como salvá-lo ou processá-lo
-        } else {
-          // Trata as mensagens de sinalização (WebRTC) como JSON
-          try {
-            const data = JSON.parse(message.data);
-            console.log('Mensagem JSON recebida:', data);
-      
-            if (data.type === 'offer') {
-              handleOffer(data.offer);
-            } else if (data.type === 'answer') {
-              handleAnswer(data.answer);
-            } else if (data.type === 'ice-candidate') {
-              handleICECandidate(data.candidate);
-            }
-          } catch (error) {
-            console.error('Erro ao analisar mensagem JSON:', error);
+        // Trata as mensagens de sinalização (WebRTC) como JSON
+        try {
+          const data = JSON.parse(message.data);
+          console.log('Mensagem JSON recebida:', data);
+
+          if (data.type === 'offer') {
+            handleOffer(data.offer);
+          } else if (data.type === 'answer') {
+            handleAnswer(data.answer);
+          } else if (data.type === 'ice-candidate') {
+            handleICECandidate(data.candidate);
           }
+        } catch (error) {
+          console.error('Erro ao analisar mensagem JSON:', error);
         }
       };
-      
     };
 
     createWebSocket();
 
     return () => {
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        socket.current.send(JSON.stringify(onmessage));
-      } else {
-        console.log('WebSocket ainda está conectando ou já foi fechado.');
+        socket.current.send(JSON.stringify({ type: 'disconnect' }));
       }
     };
   }, [handleOffer, handleAnswer, handleICECandidate]);
@@ -169,11 +148,6 @@ const Canais = () => {
       peerConnection.current = null;
       setIsInCall(false);
       setIsInConversation(false);
-    }
-
-    if (mediaRecorder.current) {
-      mediaRecorder.current.stop(); // Para a gravação do áudio
-      mediaRecorder.current = null;
     }
   };
 
