@@ -10,79 +10,69 @@ const Canais = () => {
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
   const socket = useRef(null);
+  const isSocketOpen = useRef(false); // Estado para verificar se o WebSocket está aberto
 
   const createPeer = useCallback((initiator) => {
     const peerInstance = new Peer({
       initiator,
       trickle: false,
-      stream: localAudioRef.current.srcObject // Passa o áudio local para o peer
+      stream: localAudioRef.current.srcObject
     });
 
-    // Recebe o sinal e envia através do WebSocket
     peerInstance.on('signal', (data) => {
-      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+      if (isSocketOpen.current) {
         socket.current.send(JSON.stringify(data));
       } else {
-        console.error('WebSocket ainda não está aberto para enviar mensagens.');
+        console.log("WebSocket ainda não está aberto para enviar mensagens.");
       }
     });
-    
 
-    // Quando o stream remoto for recebido
     peerInstance.on('stream', (stream) => {
-      console.log('Stream remoto recebido');
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
       }
-      setIsInConversation(true); // Outro usuário entrou na chamada
+      setIsInConversation(true);
     });
 
     peerInstance.on('close', () => {
-      console.log('Conexão Peer encerrada');
       endCall();
-    });
-
-    peerInstance.on('error', (err) => {
-      console.error('Erro no Peer:', err);
     });
 
     peer.current = peerInstance;
   }, []);
 
   const startCall = async () => {
-    try {
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (localAudioRef.current) {
-        localAudioRef.current.srcObject = localStream;
-      }
-      
-      socket.current = new WebSocket('wss://3a8a-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
-
-      socket.current.onopen = () => {
-        console.log('Conexão WebSocket estabelecida');
-        createPeer(true); 
-      };
-
-      socket.current.onmessage = (message) => {
-        console.log('Mensagem recebida via WebSocket:', message.data);
-        const data = JSON.parse(message.data);
-        if (peer.current) {
-          peer.current.signal(data); // Passa o sinal para o peer
-        }
-      };
-
-      socket.current.onclose = () => {
-        console.log('WebSocket desconectado');
-        setTimeout(() => {
-          startCall(); // Tenta reconectar após a desconexão
-        }, 3000);
-      };
-
-      createPeer(true); // Inicia o peer como iniciador
-      setIsInCall(true);
-    } catch (error) {
-      console.error('Erro ao acessar o microfone:', error);
+    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (localAudioRef.current) {
+      localAudioRef.current.srcObject = localStream;
     }
+
+    socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app ');
+
+    socket.current.onopen = () => {
+      console.log('Conexão WebSocket estabelecida');
+      isSocketOpen.current = true;
+    };
+
+    socket.current.onerror = (err) => {
+      console.error('Erro no WebSocket:', err);
+    };
+
+    socket.current.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (peer.current) {
+        peer.current.signal(data);
+      }
+    };
+
+    socket.current.onclose = () => {
+      console.log('WebSocket desconectado, tentando reconectar...');
+      isSocketOpen.current = false;
+      endCall();
+    };
+
+    createPeer(true);
+    setIsInCall(true);
   };
 
   const endCall = () => {
@@ -90,74 +80,60 @@ const Canais = () => {
       peer.current.destroy();
       peer.current = null;
     }
-    if (socket.current) {
-      socket.current.close();
-      socket.current = null;
-    }
     setIsInCall(false);
     setIsInConversation(false);
   };
 
   const handleIncomingCall = async () => {
-    try {
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (localAudioRef.current) {
-        localAudioRef.current.srcObject = localStream;
-      }
-
-      socket.current = new WebSocket('wss://3a8a-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
-
-      socket.current.onmessage = (message) => {
-        console.log('Mensagem recebida via WebSocket:', message.data);
-        const data = JSON.parse(message.data);
-        if (peer.current) {
-          peer.current.signal(data); // Passa o sinal para o peer
-        }
-      };
-
-      createPeer(false); // Cria o peer sem ser o iniciador
-      setIsInCall(true);
-    } catch (error) {
-      console.error('Erro ao acessar o microfone:', error);
+    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (localAudioRef.current) {
+      localAudioRef.current.srcObject = localStream;
     }
+
+    socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app ');
+
+    socket.current.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (peer.current) {
+        peer.current.signal(data);
+      }
+    };
+
+    createPeer(false);
+    setIsInCall(true);
   };
 
   useEffect(() => {
     const createWebSocket = () => {
-      socket.current = new WebSocket('wss://3a8a-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app');
-  
+      socket.current = new WebSocket('wss://3b85-2804-4dd0-c002-9600-3446-cbdc-6721-6a1c.ngrok-free.app ');
+
       socket.current.onopen = () => {
-        console.log('WebSocket conectado com sucesso');
+        console.log('Esperando por chamadas...');
+        isSocketOpen.current = true;
       };
-  
-      socket.current.onerror = (error) => {
-        console.error('Erro no WebSocket:', error);
+
+      socket.current.onmessage = (message) => {
+        handleIncomingCall();
       };
-  
+
+      socket.current.onerror = (err) => {
+        console.error('Erro no WebSocket:', err);
+      };
+
       socket.current.onclose = () => {
         console.log('WebSocket desconectado, tentando reconectar...');
-        setTimeout(() => {
-          createWebSocket(); // Tentar reconectar automaticamente
-        }, 3000);
-      };
-  
-      socket.current.onmessage = (message) => {
-        console.log('Mensagem recebida:', message.data);
-        handleIncomingCall(); // Chamada recebida
+        isSocketOpen.current = false;
       };
     };
-  
+
     createWebSocket();
-    
+
     return () => {
       if (socket.current) {
         socket.current.close();
       }
     };
   }, [handleIncomingCall]);
-  
-
-
 
   return (
     <div className="flex-1 flex flex-col p-6 overflow-auto">
