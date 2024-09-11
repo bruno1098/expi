@@ -29,7 +29,14 @@ const Canais = () => {
         remoteAudioRef.current.srcObject = stream;
       }
       setIsInConversation(true);
-      setUsersInCall((prevUsers) => [...prevUsers, 'Outro Usuário']); // Adiciona um "usuário" à chamada
+
+      // Adiciona um único "usuário" à chamada se não estiver na lista ainda
+      setUsersInCall((prevUsers) => {
+        if (!prevUsers.includes('Outro Usuário')) {
+          return [...prevUsers, 'Outro Usuário'];
+        }
+        return prevUsers;
+      });
     });
 
     peerInstance.on('close', () => {
@@ -100,7 +107,14 @@ const Canais = () => {
 
     peer.current.signal(data);  
     setIsInCall(true);
-    setUsersInCall((prevUsers) => [...prevUsers, 'Outro Usuário']); // Adiciona um novo usuário
+
+    // Garante que o "Outro Usuário" seja adicionado apenas uma vez
+    setUsersInCall((prevUsers) => {
+      if (!prevUsers.includes('Outro Usuário')) {
+        return [...prevUsers, 'Outro Usuário'];
+      }
+      return prevUsers;
+    });
   }, [createPeer]);
 
   useEffect(() => {
@@ -134,7 +148,7 @@ const Canais = () => {
   }, [handleIncomingCall]);
 
   return (
-    <div className="p-6">
+    <div className="flex-1 flex flex-col items-center justify-center h-full">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
 
       {isInCall && (
@@ -149,8 +163,9 @@ const Canais = () => {
         </button>
       )}
 
+      {/* Exibir usuários conectados */}
       {usersInCall.length > 0 && (
-        <div className="flex justify-center items-center h-64">
+        <div className="flex flex-wrap justify-center gap-6 my-8">
           {usersInCall.map((user, index) => (
             <div key={index} className="flex flex-col items-center mx-4">
               {/* Ícones de usuários */}
