@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { FaPhoneAlt } from "react-icons/fa";
+import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
 
 const Canais = () => {
   const [isInCall, setIsInCall] = useState(false);
-  const [isInConversation, setIsInConversation] = useState(false);
+  const [currentChannel, setCurrentChannel] = useState(null); // Canal atual
   const [usersInCall, setUsersInCall] = useState([]); // Lista de usuários conectados
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -19,8 +19,10 @@ const Canais = () => {
     });
 
     peerInstance.on('signal', (data) => {
-      if (socket.current) {
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         socket.current.send(JSON.stringify(data));
+      } else {
+        console.log('WebSocket ainda não está pronto para enviar dados.');
       }
     });
 
@@ -28,9 +30,9 @@ const Canais = () => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
       }
-      setIsInConversation(true);
+      setIsInCall(true);
 
-      // Adiciona um único "usuário" à chamada se não estiver na lista ainda
+      // Adiciona o outro usuário na lista se não estiver
       setUsersInCall((prevUsers) => {
         if (!prevUsers.includes('Outro Usuário')) {
           return [...prevUsers, 'Outro Usuário'];
@@ -40,13 +42,15 @@ const Canais = () => {
     });
 
     peerInstance.on('close', () => {
-      endCall();
+      setIsInCall(false);
     });
 
     peer.current = peerInstance;
   }, []);
 
-  const startCall = async () => {
+  const enterVoiceChannel = async (channelName) => {
+    setCurrentChannel(channelName); // Define o canal atual
+
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
@@ -68,7 +72,6 @@ const Canais = () => {
 
       socket.current.onclose = () => {
         console.log('WebSocket desconectado');
-        endCall();
       };
 
       socket.current.onerror = (error) => {
@@ -77,22 +80,24 @@ const Canais = () => {
     }
 
     createPeer(true);
-    setIsInCall(true);
-    setUsersInCall(['Você']); // Adiciona o usuário local na chamada
+    setUsersInCall((prevUsers) => ['Você', ...prevUsers]); // Adiciona o usuário local no canal
   };
 
-  const endCall = () => {
+  const leaveVoiceChannel = () => {
     if (peer.current) {
       peer.current.destroy();
       peer.current = null;
     }
+
     if (socket.current) {
       socket.current.close();
       socket.current = null;
     }
+
+    // Remove o usuário local da lista
+    setUsersInCall((prevUsers) => prevUsers.filter((user) => user !== 'Você'));
     setIsInCall(false);
-    setIsInConversation(false);
-    setUsersInCall([]); // Limpa a lista de usuários ao encerrar a chamada
+    setCurrentChannel(null); // Remove o canal atual
   };
 
   const handleIncomingCall = useCallback(async (data) => {
@@ -102,13 +107,11 @@ const Canais = () => {
     }
 
     if (!peer.current || peer.current.destroyed) {
-      createPeer(false);  
+      createPeer(false);
     }
 
-    peer.current.signal(data);  
+    peer.current.signal(data);
     setIsInCall(true);
-
-    // Garante que o "Outro Usuário" seja adicionado apenas uma vez
     setUsersInCall((prevUsers) => {
       if (!prevUsers.includes('Outro Usuário')) {
         return [...prevUsers, 'Outro Usuário'];
@@ -148,41 +151,51 @@ const Canais = () => {
   }, [handleIncomingCall]);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center h-full">
+    <div className="flex-1 flex flex-col items-center justify-center h-full bg-gray-900 text-white">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
 
-      {isInCall && (
-        <div className="bg-green-500 text-white p-4 rounded-md">
-          <FaPhoneAlt /> Você está em uma chamada!
-        </div>
-      )}
+      <div className="w-full max-w-md bg-gray-800 rounded-md p-4">
+        <h3 className="text-lg font-semibold mb-2">Canais</h3>
+        <ul className="space-y-2">
+          {/* Canal 1 */}
+          <li
+            className={`flex flex-col items-start p-2 bg-gray-700 rounded cursor-pointer ${currentChannel === 'Tudo que eu quero' ? 'bg-gray-600' : ''}`}
+            onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Tudo que eu quero'))}
+          >
+            <span>Tudo que eu quero</span>
+            {/* Exibir usuários conectados ao clicar no canal */}
+            {currentChannel === 'Tudo que eu quero' && usersInCall.length > 0 && (
+              <ul className="pl-4 pt-2 space-y-1">
+                {usersInCall.map((user, index) => (
+                  <li key={index} className="flex items-center space-x-2">
+                    <FaUser className="text-gray-300" />
+                    <span>{user}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
 
-      {!isInCall && (
-        <button onClick={startCall} className="bg-blue-500 text-white p-3 rounded-md">
-          Iniciar Chamada
-        </button>
-      )}
-
-      {/* Exibir usuários conectados */}
-      {usersInCall.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-6 my-8">
-          {usersInCall.map((user, index) => (
-            <div key={index} className="flex flex-col items-center mx-4">
-              {/* Ícones de usuários */}
-              <div className="w-16 h-16 bg-gray-400 rounded-full flex items-center justify-center text-white">
-                {user[0]}
-              </div>
-              <span className="mt-2 text-center">{user}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {isInCall && (
-        <button onClick={endCall} className="bg-red-500 text-white p-2 mt-4 rounded-md">
-          Encerrar Chamada
-        </button>
-      )}
+          {/* Canal 2 */}
+          <li
+            className={`flex flex-col items-start p-2 bg-gray-700 rounded cursor-pointer ${currentChannel === 'Meu Plug me traz' ? 'bg-gray-600' : ''}`}
+            onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Meu Plug me traz'))}
+          >
+            <span>Meu Plug me traz</span>
+            {/* Exibir usuários conectados ao clicar no canal */}
+            {currentChannel === 'Meu Plug me traz' && usersInCall.length > 0 && (
+              <ul className="pl-4 pt-2 space-y-1">
+                {usersInCall.map((user, index) => (
+                  <li key={index} className="flex items-center space-x-2">
+                    <FaUser className="text-gray-300" />
+                    <span>{user}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        </ul>
+      </div>
 
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />
