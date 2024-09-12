@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
-import { getDatabase, ref, set, get } from "firebase/database";
+import { ref, get } from "firebase/database";
 import { database } from "../pages/api/feedback"; // Certifique-se de importar corretamente o Firebase
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; // Removendo o Modal, pois ele já está no chat
@@ -14,6 +14,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   const peer = useRef(null);
   const socket = useRef(null);
 
+  // Cria o peer para a conexão de áudio
   const createPeer = useCallback((initiator) => {
     const peerInstance = new Peer({
       initiator,
@@ -53,6 +54,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     peer.current = peerInstance;
   }, [setUsersInCall, userId]);
 
+  // Entrar em um canal de voz
   const enterVoiceChannel = async (channelName) => {
     if (!userName) {
       setIsUserModalOpen(true);
@@ -77,7 +79,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
         if (data.signalData) {
           try {
-            // Verifique o estado do peer antes de sinalizar
+            // Verifica o estado do peer antes de sinalizar
             if (peer.current && peer.current._pc.signalingState === 'stable') {
               console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
             } else {
@@ -113,6 +115,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     setUsersInCall((prevUsers) => [...prevUsers, localUserName]);
   };
 
+  // Sair de um canal de voz
   const leaveVoiceChannel = () => {
     if (peer.current) {
       peer.current.destroy();
@@ -129,6 +132,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     setCurrentChannel(null);
   };
 
+  // Lida com chamadas de entrada
   const handleIncomingCall = useCallback(async (data) => {
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
@@ -139,7 +143,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       createPeer(false);
     }
 
-    // Verifique o estado do peer antes de sinalizar
     if (peer.current && peer.current._pc.signalingState === 'stable') {
       console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
     } else {
@@ -157,6 +160,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     });
   }, [createPeer, setUsersInCall]);
 
+  // Configura o WebSocket ao montar o componente
   useEffect(() => {
     if (!socket.current) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
@@ -187,6 +191,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
   }, [handleIncomingCall]);
 
+  // Busca o nome de usuário do Firebase
   const getUserNameFromFirebase = async (userId) => {
     try {
       const userRef = ref(database, `users/${userId}`);
@@ -204,7 +209,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
   };
 
-
+  // Renderiza os canais de voz
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-background text-foreground">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
@@ -212,7 +217,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       <div className="w-full max-w-md bg-background rounded-md p-4">
         <h3 className="text-lg font-semibold mb-2">Canais</h3>
         <ul className="space-y-2">
-          {/* Canal 1 */}
           <li
             className={`flex flex-col items-start p-2 rounded cursor-pointer bg-muted ${currentChannel === 'Tudo que eu quero' ? 'bg-primary' : ''}`}
             onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Tudo que eu quero'))}
@@ -231,7 +235,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
             )}
           </li>
   
-          {/* Canal 2 */}
           <li
             className={`flex flex-col items-start p-2 rounded cursor-pointer bg-muted ${currentChannel === 'Meu Plug me traz' ? 'bg-primary' : ''}`}
             onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Meu Plug me traz'))}
@@ -256,8 +259,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       <audio ref={remoteAudioRef} autoPlay />
     </div>
   );
-  
-  
 };
 
 export default Canais;
