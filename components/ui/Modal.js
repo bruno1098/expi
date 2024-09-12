@@ -12,14 +12,11 @@ const Modal = ({ isOpen, onClose, title, children, isLoading }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <animated.div style={animation} className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full z-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <animated.div style={animation} className="relative bg-background text-foreground rounded-lg shadow-lg p-6 max-w-md w-full z-50">
         
-<div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full z-50" style={{ backgroundColor: 'white', opacity: 1 }}>
+        <h2 className="text-xl font-semibold">{title}</h2>
 
-          <h2 className="text-xl font-semibold">{title}</h2>
-         
-        
         {isLoading ? (
           <div className="flex justify-center items-center h-32">
             <ClipLoader size={50} color={"#123abc"} loading={isLoading} />
@@ -33,12 +30,10 @@ const Modal = ({ isOpen, onClose, title, children, isLoading }) => {
             Fechar
           </button>
         </div>
-        </div>      
+        
       </animated.div>
     </div>
-    
   );
 };
 
 export default Modal;
-

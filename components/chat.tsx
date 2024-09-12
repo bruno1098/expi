@@ -44,11 +44,48 @@ export function Chat() {
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [modalLoading, setModalLoading] = useState(false);
-  const [usersInCall, setUsersInCall] = useState([]); 
+  const [usersInCall, setUsersInCall] = useState([]);
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userName, setUserName] = useState("");
   const [userId, setUserId] = useState("");
+
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Carregar o nome e o tema salvos no localStorage na inicialização
+  useEffect(() => {
+    // Verifica se há uma preferência de tema salva no localStorage
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      setIsDarkMode(savedTheme === 'dark');
+    } else {
+      // Se não houver tema salvo, usa a preferência do sistema
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setIsDarkMode(systemPrefersDark);
+    }
+
+    // Carregar o nome de usuário salvo no localStorage
+    const savedUserName = localStorage.getItem('userName');
+    if (savedUserName) {
+      setUserName(savedUserName);
+    }
+  }, []);
+
+  // Efeito para aplicar o tema e salvar no localStorage
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  // Função para alternar o tema
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
 
   const client = axios.create({
     baseURL: "https://api.openai.com/v1",
@@ -62,39 +99,39 @@ export function Chat() {
     // Carregar o nome do usuário e o ID do sessionStorage
     const savedUserName = sessionStorage.getItem("userName") ?? ""; // Garantir que nunca seja null
     const savedUserId = sessionStorage.getItem("userId") ?? ""; // Garantir que nunca seja null
-    
+
     setUserName(savedUserName);
     setUserId(savedUserId);
   }, []);
-  
-  
+
+
 
   const handleSaveUserName = async () => {
     if (userName.trim() === "") {
       alert("Por favor, insira um nome válido.");
       return;
     }
-  
+
     try {
       // Obter o próximo ID único para o usuário
       const newUserId = await getNextUserId();
-  
+
       // Salvar o usuário no Firebase
       await saveUserToFirebase(newUserId, userName);
-  
+
       // Salvar o nome e ID do usuário no sessionStorage
       sessionStorage.setItem("userName", userName);
       sessionStorage.setItem("userId", newUserId);
-  
+
       setUserId(newUserId);
       setIsUserModalOpen(false); // Fecha o modal
     } catch (error) {
       console.error("Erro ao salvar o usuário:", error);
     }
   };
-  
 
-  
+
+
 
 
   useEffect(() => {
@@ -421,7 +458,7 @@ export function Chat() {
       setModalLoading(false);
     }
   };
-  
+
 
   const handleCloseFeedbackModal = () => {
     setIsFeedbackModalOpen(false);
@@ -442,18 +479,23 @@ export function Chat() {
           </Avatar>
           <h1 className="text-xl font-bold">Expi</h1>
         </div>
-        <div>
+
+        <div className="flex items-center gap-2">
           {/* Ícone para abrir o modal de nome do usuário */}
           <Avatar className="w-8 h-8" onClick={() => setIsUserModalOpen(true)}>
             <AvatarImage src="/user.png" alt="User" />
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
+          <p className="text-sm">
+            {userName ? `Olá, ${userName}` : "Insira seu nome"}
+          </p>
+
         </div>
         <Button onClick={handleNewConversation} variant="ghost" className="p-2 rounded-full">
           Nova Conversa
         </Button>
       </header>
-  
+
       {/* Reutilizando o Modal para o usuário inserir o nome */}
       {isUserModalOpen && (
         <Modal
@@ -470,7 +512,7 @@ export function Chat() {
           <Button onClick={handleSaveUserName}>Salvar</Button>
         </Modal>
       )}
-  
+
       <div className="flex-1 flex overflow-hidden">
         {/* Tabs para alternar entre histórico de conversas e canais de voz */}
         <div className="w-64 border-r bg-background flex-shrink-0 flex flex-col">
@@ -478,8 +520,9 @@ export function Chat() {
             <TabsList className="border-b">
               <TabsTrigger value="history">Expi</TabsTrigger>
               <TabsTrigger value="voicechat">Voice Chat</TabsTrigger>
+              <TabsTrigger value="modoescu">Configs</TabsTrigger>
             </TabsList>
-  
+
             <TabsContent value="voicechat" className="p-4 overflow-auto flex-1">
               {/* Passando estados e funções para o componente de canais */}
               <Canais
@@ -490,8 +533,17 @@ export function Chat() {
                 setUserName={setUserName}
                 setIsUserModalOpen={setIsUserModalOpen} // Passando o controle do modal
               />
+            </TabsContent >
+            <TabsContent value="modoescu" className="p-4 overflow-auto flex-1">
+              <button
+                onClick={toggleTheme}
+                className="p-2 bg-primary text-primary-foreground rounded-lg"
+              >
+                {isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
+              </button>
             </TabsContent>
-  
+
+
             <TabsContent value="history" className="p-4 overflow-auto flex-1">
               <div className="p-4 border-b">
                 <Input placeholder="Search conversations" className="w-full" />
@@ -528,33 +580,37 @@ export function Chat() {
             </TabsContent>
           </Tabs>
         </div>
-  
+
         {/* Área de chat ou voz */}
-        <div className="flex flex-col flex-1 h-full">
+        <div className="flex flex-col flex-1 h-full" >
           {selectedTab === "voicechat" ? (
-            <div className="flex flex-col items-center justify-center h-full">
+            <div className="flex flex-col items-center justify-center h-full bg-background">
               <h2 className="text-2xl font-bold mb-4">Canais de Voz</h2>
+
               {/* Verifique o estado de `usersInCall` */}
               {usersInCall && usersInCall.length > 0 ? (
                 <div className="flex flex-wrap justify-center gap-6">
                   {usersInCall.map((user: string, index: number) => (
-                    <div key={index} className="flex flex-col items-center">
-                      <Avatar className="w-16 h-16">
+                    <div key={index} className="flex flex-col items-center bg-card p-4 rounded-lg shadow ">
+                      <Avatar className="w-16 h-16 bg-primary-foreground text-primary">
                         <AvatarImage src="/user.png" alt={`User ${index}`} />
                         <AvatarFallback>{user ? user.charAt(0) : 'U'}</AvatarFallback>
                       </Avatar>
-                      <span className="mt-2 text-center">{user === 'self' ? userName : user}</span>
+                      <span className="mt-2 text-center text-foreground">
+                        {user === 'self' ? userName : user}
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-center text-muted-foreground">Nenhum usuário conectado ainda</p>
+                <p className="text-muted-foreground">Nenhum usuário conectado ainda</p>
               )}
             </div>
+
           ) : (
             <>
               <div className="flex-1 p-6 overflow-auto h-[calc(100vh-150px)]">
-                <div className="grid gap-4">
+                <div className="grid gap-4 ">
                   {messages.map((message, index) => (
                     <div key={index} className={`flex items-start gap-4 ${message.role === "user" ? "justify-end" : ""}`}>
                       {message.role === "ai" && (
@@ -582,7 +638,7 @@ export function Chat() {
                 </div>
                 <div ref={messageEndRef} />
               </div>
-  
+
               <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
                 <Textarea
                   placeholder="Digite sua mensagem..."
@@ -612,8 +668,8 @@ export function Chat() {
       </div>
     </div>
   );
-  
-  
+
+
 
 }
 
@@ -659,3 +715,5 @@ function SendIcon(props: React.JSX.IntrinsicAttributes & React.SVGProps<SVGSVGEl
     </svg>
   );
 }
+
+
