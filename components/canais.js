@@ -25,7 +25,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         const payload = {
           signalData,
-          userId, // Enviar userId junto com os dados de sinalização
+          userId,
         };
         socket.current.send(JSON.stringify(payload));
       }
@@ -54,9 +54,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   }, [setUsersInCall, userId]);
 
   const enterVoiceChannel = async (channelName) => {
-    // Se o nome do usuário não estiver definido, abre o modal
     if (!userName) {
-      setIsUserModalOpen(true); // Abrindo o modal do chat
+      setIsUserModalOpen(true);
       return;
     }
 
@@ -78,7 +77,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
         if (data.signalData) {
           try {
-            peer.current.signal(data.signalData);
+            // Verifique o estado do peer antes de sinalizar
+            if (peer.current && peer.current._pc.signalingState === 'stable') {
+              console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
+            } else {
+              peer.current.signal(data.signalData);
+            }
           } catch (err) {
             console.error("Erro ao sinalizar o peer:", err);
           }
@@ -135,7 +139,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       createPeer(false);
     }
 
-    peer.current.signal(data.signalData);
+    // Verifique o estado do peer antes de sinalizar
+    if (peer.current && peer.current._pc.signalingState === 'stable') {
+      console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
+    } else {
+      peer.current.signal(data.signalData);
+    }
 
     const remoteUserName = await getUserNameFromFirebase(data.userId);
 
@@ -194,6 +203,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       return "Outro Usuário";
     }
   };
+
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-background text-foreground">
