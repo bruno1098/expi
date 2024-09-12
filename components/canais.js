@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
+import { getDatabase, ref, set, get } from "firebase/database";
+import { database } from "../pages/api/feedback"; // Certifique-se de importar corretamente o Firebase
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // Removendo o Modal, pois ele já está no chat
 
-const Canais = () => {
+const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
   const [isInCall, setIsInCall] = useState(false);
-  const [currentChannel, setCurrentChannel] = useState(null); // Canal atual
-  const [usersInCall, setUsersInCall] = useState([]); // Lista de usuários conectados
+  const [currentChannel, setCurrentChannel] = useState(null);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
@@ -18,24 +21,26 @@ const Canais = () => {
       stream: localAudioRef.current.srcObject,
     });
 
-    peerInstance.on('signal', (data) => {
+    peerInstance.on('signal', (signalData) => {
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        socket.current.send(JSON.stringify(data));
-      } else {
-        console.log('WebSocket ainda não está pronto para enviar dados.');
+        const payload = {
+          signalData,
+          userId, // Enviar userId junto com os dados de sinalização
+        };
+        socket.current.send(JSON.stringify(payload));
       }
     });
 
-    peerInstance.on('stream', (stream) => {
+    peerInstance.on('stream', async (stream) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
       }
       setIsInCall(true);
 
-      // Adiciona o outro usuário na lista se não estiver
+      const otherUserName = await getUserNameFromFirebase(userId);
       setUsersInCall((prevUsers) => {
-        if (!prevUsers.includes('Outro Usuário')) {
-          return [...prevUsers, 'Outro Usuário'];
+        if (!prevUsers.includes(otherUserName)) {
+          return [...prevUsers, otherUserName];
         }
         return prevUsers;
       });
@@ -46,11 +51,16 @@ const Canais = () => {
     });
 
     peer.current = peerInstance;
-  }, []);
+  }, [setUsersInCall, userId]);
 
   const enterVoiceChannel = async (channelName) => {
-    setCurrentChannel(channelName); // Define o canal atual
+    // Se o nome do usuário não estiver definido, abre o modal
+    if (!userName) {
+      setIsUserModalOpen(true); // Abrindo o modal do chat
+      return;
+    }
 
+    setCurrentChannel(channelName);
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
@@ -63,10 +73,25 @@ const Canais = () => {
         console.log('Conexão WebSocket estabelecida');
       };
 
-      socket.current.onmessage = (message) => {
+      socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
-        if (peer.current) {
-          peer.current.signal(data);
+
+        if (data.signalData) {
+          try {
+            peer.current.signal(data.signalData);
+          } catch (err) {
+            console.error("Erro ao sinalizar o peer:", err);
+          }
+        }
+
+        if (data.userId) {
+          const remoteUserName = await getUserNameFromFirebase(data.userId);
+          setUsersInCall((prevUsers) => {
+            if (!prevUsers.includes(remoteUserName)) {
+              return [...prevUsers, remoteUserName];
+            }
+            return prevUsers;
+          });
         }
       };
 
@@ -79,8 +104,9 @@ const Canais = () => {
       };
     }
 
+    const localUserName = await getUserNameFromFirebase(userId);
     createPeer(true);
-    setUsersInCall((prevUsers) => ['Você', ...prevUsers]); // Adiciona o usuário local no canal
+    setUsersInCall((prevUsers) => [...prevUsers, localUserName]);
   };
 
   const leaveVoiceChannel = () => {
@@ -94,10 +120,9 @@ const Canais = () => {
       socket.current = null;
     }
 
-    // Remove o usuário local da lista
-    setUsersInCall((prevUsers) => prevUsers.filter((user) => user !== 'Você'));
+    setUsersInCall((prevUsers) => prevUsers.filter((user) => user !== userName));
     setIsInCall(false);
-    setCurrentChannel(null); // Remove o canal atual
+    setCurrentChannel(null);
   };
 
   const handleIncomingCall = useCallback(async (data) => {
@@ -110,15 +135,18 @@ const Canais = () => {
       createPeer(false);
     }
 
-    peer.current.signal(data);
+    peer.current.signal(data.signalData);
+
+    const remoteUserName = await getUserNameFromFirebase(data.userId);
+
     setIsInCall(true);
     setUsersInCall((prevUsers) => {
-      if (!prevUsers.includes('Outro Usuário')) {
-        return [...prevUsers, 'Outro Usuário'];
+      if (!prevUsers.includes(remoteUserName)) {
+        return [...prevUsers, remoteUserName];
       }
       return prevUsers;
     });
-  }, [createPeer]);
+  }, [createPeer, setUsersInCall]);
 
   useEffect(() => {
     if (!socket.current) {
@@ -150,6 +178,23 @@ const Canais = () => {
     };
   }, [handleIncomingCall]);
 
+  const getUserNameFromFirebase = async (userId) => {
+    try {
+      const userRef = ref(database, `users/${userId}`);
+      const snapshot = await get(userRef);
+
+      if (snapshot.exists()) {
+        return snapshot.val().name;
+      } else {
+        console.error("Usuário não encontrado no Firebase");
+        return "Outro Usuário";
+      }
+    } catch (error) {
+      console.error("Erro ao buscar o nome do usuário:", error);
+      return "Outro Usuário";
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-gray-900 text-white">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
@@ -163,13 +208,12 @@ const Canais = () => {
             onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Tudo que eu quero'))}
           >
             <span>Tudo que eu quero</span>
-            {/* Exibir usuários conectados ao clicar no canal */}
             {currentChannel === 'Tudo que eu quero' && usersInCall.length > 0 && (
               <ul className="pl-4 pt-2 space-y-1">
                 {usersInCall.map((user, index) => (
                   <li key={index} className="flex items-center space-x-2">
                     <FaUser className="text-gray-300" />
-                    <span>{user}</span>
+                    <span>{user === 'self' ? userName : user}</span>
                   </li>
                 ))}
               </ul>
@@ -182,13 +226,12 @@ const Canais = () => {
             onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Meu Plug me traz'))}
           >
             <span>Meu Plug me traz</span>
-            {/* Exibir usuários conectados ao clicar no canal */}
             {currentChannel === 'Meu Plug me traz' && usersInCall.length > 0 && (
               <ul className="pl-4 pt-2 space-y-1">
                 {usersInCall.map((user, index) => (
                   <li key={index} className="flex items-center space-x-2">
                     <FaUser className="text-gray-300" />
-                    <span>{user}</span>
+                    <span>{user === 'self' ? userName : user}</span>
                   </li>
                 ))}
               </ul>

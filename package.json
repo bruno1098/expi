@@ -30,6 +30,7 @@
     "react-modal": "^3.16.1",
     "react-spinners": "^0.14.1",
     "simple-peer": "^9.11.1",
+    "tailwind": "^4.0.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^10.0.0",

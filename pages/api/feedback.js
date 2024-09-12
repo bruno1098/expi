@@ -4,13 +4,13 @@ import { getDatabase, ref, set, get, remove, runTransaction } from "firebase/dat
 // Configurações do Firebase com suas credenciais
 const firebaseConfig = {
 
-  apiKey: "AIzaSyBoCA8htD7kcfCMfephG6O1oKlrG2hbGzU",
-  authDomain: "expi-e7219.firebaseapp.com",
-  databaseURL: "https://expi-e7219-default-rtdb.firebaseio.com",
-  projectId: "expi-e7219",
-  storageBucket: "expi-e7219.appspot.com",
-  messagingSenderId: "873889751904",
-  appId: "1:873889751904:web:041d5ea449384087727405"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 // Inicializa o Firebase
@@ -73,6 +73,32 @@ export const deleteConversationFromFirebase = async (conversationId) => {
   }
 };
 
+
+
+// Função para gerar o próximo ID único de usuário
+export const getNextUserId = async () => {
+  const idRef = ref(database, 'userCounter/id');
+  const nextId = await runTransaction(idRef, (currentId) => {
+    return (currentId || 0) + 1;
+  });
+
+  return nextId.snapshot.val();
+};
+
+// Função para salvar um usuário no Firebase
+export const saveUserToFirebase = async (userId, userName) => {
+  try {
+    const userRef = ref(database, `users/${userId}`);
+    await set(userRef, {
+      id: userId,
+      name: userName,
+    });
+    console.log("Usuário salvo com sucesso no Firebase!");
+  } catch (error) {
+    console.error("Erro ao salvar usuário no Firebase:", error);
+    throw error;
+  }
+};
 
 const handler = async (req, res) => {
   if (req.method === 'POST') {
