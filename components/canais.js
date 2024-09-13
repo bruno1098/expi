@@ -172,7 +172,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   // Configura o WebSocket ao montar o componente
   useEffect(() => {
     if (!socket.current) {
-      socket.current = new WebSocket('wss://serverexpi.onrender.com');
+      socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
 
       socket.current.onopen = () => {
         console.log('Esperando por chamadas...');
