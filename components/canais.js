@@ -44,7 +44,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       } else {
         console.warn('WebSocket não está aberto para envio de dados');
       }
-      
     });
     
     peerInstance.on('connect', () => {
@@ -53,6 +52,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     peerInstance.on('error', (err) => {
       console.error('Erro na conexão Peer:', err);
+      if (err.message.includes('renegotiate')) {
+        console.log('Tentando recriar o peer devido a erro de renegociação');
+        // Destrua e recrie o peer se houver um erro de renegociação
+        if (peer.current) {
+          peer.current.destroy();
+          peer.current = null;
+          createPeer(true);  // Recria o peer
+        }
+      }
     });
   
     peerInstance.on('close', () => {
