@@ -240,18 +240,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
   };
 
-  peerInstance.on('error', (err) => {
-    console.error('Erro na conexão Peer:', err);
-    if (err.message.includes('renegotiate')) {
-      console.log('Tentando recriar o peer devido a erro de renegociação');
-      // Aqui você pode tentar destruir e recriar o peer
-      if (peer.current) {
-        peer.current.destroy();
-        peer.current = null;
-        createPeer(true);  // Recria o peer
-      }
-    }
-  });
+  
   
 
 
