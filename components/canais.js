@@ -139,7 +139,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     createPeer(true);
     setUsersInCall((prevUsers) => [...prevUsers, localUserName]);
   };
-  
+
+ 
 
   // Sair de um canal de voz
   const leaveVoiceChannel = () => {
