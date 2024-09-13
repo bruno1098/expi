@@ -31,7 +31,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         socket.current.send(JSON.stringify(payload));
       }
     });
-
+    
+    peerInstance.on('connect', () => {
+      console.log('Conexão Peer estabelecida com sucesso');
+    });
+    
+    peerInstance.on('error', (err) => {
+      console.error('Erro na conexão Peer:', err);
+    });
+    
     peerInstance.on('stream', async (stream) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
