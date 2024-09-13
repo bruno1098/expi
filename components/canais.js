@@ -16,12 +16,18 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
   // Cria o peer para a conexão de áudio
   const createPeer = useCallback((initiator) => {
+    if (!localAudioRef.current || !localAudioRef.current.srcObject) {
+      console.error('Stream de áudio local não está disponível');
+      return;
+    }
+  
     const peerInstance = new Peer({
       initiator,
       trickle: false,
       stream: localAudioRef.current.srcObject,
     });
-
+  
+    // Adicione os eventos 'signal', 'connect', 'error', etc.
     peerInstance.on('signal', (signalData) => {
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         const payload = {
@@ -31,37 +37,19 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         socket.current.send(JSON.stringify(payload));
       }
     });
-
-    peerInstance.on('connect', () => {
-      console.log('Conexão Peer estabelecida com sucesso');
-    });
-
+  
     peerInstance.on('error', (err) => {
       console.error('Erro na conexão Peer:', err);
     });
-
-    peerInstance.on('stream', async (stream) => {
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = stream;
-      }
-      setIsInCall(true);
-
-      const otherUserName = await getUserNameFromFirebase(userId);
-      setUsersInCall((prevUsers) => {
-        if (!prevUsers.includes(otherUserName)) {
-          return [...prevUsers, otherUserName];
-        }
-        return prevUsers;
-      });
-    });
-
+  
     peerInstance.on('close', () => {
       setIsInCall(false);
       console.log('Conexão Peer foi fechada.');
     });
-
+  
     peer.current = peerInstance;
   }, [setUsersInCall, userId]);
+  
 
   // Entrar em um canal de voz
   const enterVoiceChannel = async (channelName) => {
@@ -85,21 +73,22 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
-
+      
         if (data.signalData) {
-          try {
-            if (peer.current && peer.current._pc.signalingState === 'stable') {
-              console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
-            } else if (peer.current && peer.current._pc.signalingState !== 'closed') {
+          if (peer.current && peer.current._pc.signalingState === 'stable') {
+            console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
+          } else if (peer.current && peer.current._pc.signalingState !== 'closed') {
+            try {
               peer.current.signal(data.signalData);
-            } else {
-              console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
+            } catch (err) {
+              console.error("Erro ao sinalizar o peer:", err);
             }
-          } catch (err) {
-            console.error("Erro ao sinalizar o peer:", err);
+          } else {
+            console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
           }
         }
-
+      
+      
         if (data.userId) {
           const remoteUserName = await getUserNameFromFirebase(data.userId);
           setUsersInCall((prevUsers) => {
@@ -153,11 +142,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       createPeer(false);
     }
 
-    if (peer.current && peer.current._pc.signalingState !== 'stable' && peer.current._pc.signalingState !== 'closed') {
+    if (peer.current && peer.current._pc && peer.current._pc.signalingState !== 'closed') {
       peer.current.signal(data.signalData);
     } else {
-      console.warn('RTCPeerConnection já está no estado stable ou fechado. Ignorando sinal.');
+      console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
     }
+    
 
     const remoteUserName = await getUserNameFromFirebase(data.userId);
 
