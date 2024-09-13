@@ -41,7 +41,10 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           userId,
         };
         socket.current.send(JSON.stringify(payload));
+      } else {
+        console.warn('WebSocket não está aberto para envio de dados');
       }
+      
     });
     
     peerInstance.on('connect', () => {
@@ -66,23 +69,28 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       setIsUserModalOpen(true);
       return;
     }
-
+  
     setCurrentChannel(channelName);
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
     }
-
+  
+    // Se o peer já existir, destrua-o antes de criar um novo
+    if (peer.current) {
+      peer.current.destroy();
+      peer.current = null;
+    }
+  
     if (!socket.current || socket.current.readyState !== WebSocket.OPEN) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
-
+  
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
       };
-
+  
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
-      
         if (data.signalData) {
           if (peer.current && peer.current._pc) {
             if (peer.current._pc.signalingState === 'stable') {
@@ -98,7 +106,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
             }
           }
         }          
-
+  
         if (data.userId) {
           const remoteUserName = await getUserNameFromFirebase(data.userId);
           setUsersInCall((prevUsers) => {
@@ -109,20 +117,21 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           });
         }
       };
-
+  
       socket.current.onclose = () => {
         console.log('WebSocket desconectado');
       };
-
+  
       socket.current.onerror = (error) => {
         console.error('Erro no WebSocket:', error);
       };
     }
-
+  
     const localUserName = await getUserNameFromFirebase(userId);
     createPeer(true);
     setUsersInCall((prevUsers) => [...prevUsers, localUserName]);
   };
+  
 
   // Sair de um canal de voz
   const leaveVoiceChannel = () => {
@@ -221,6 +230,20 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       return "Outro Usuário";
     }
   };
+
+  peerInstance.on('error', (err) => {
+    console.error('Erro na conexão Peer:', err);
+    if (err.message.includes('renegotiate')) {
+      console.log('Tentando recriar o peer devido a erro de renegociação');
+      // Aqui você pode tentar destruir e recriar o peer
+      if (peer.current) {
+        peer.current.destroy();
+        peer.current = null;
+        createPeer(true);  // Recria o peer
+      }
+    }
+  });
+  
 
 
   // Renderiza os canais de voz
