@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
 import { getDatabase, ref, set, get } from "firebase/database";
-import { database } from "../pages/api/feedback"; // Certifique-se de importar corretamente o Firebase
+import { database } from "../pages/api/feedback"; 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Removendo o Modal, pois ele já está no chat
+import { Input } from "@/components/ui/input"; 
 
 const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
   const [isInCall, setIsInCall] = useState(false);
@@ -25,38 +25,32 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         const payload = {
           signalData,
-          userId, // Enviar userId junto com os dados de sinalização
+          userId,
         };
         socket.current.send(JSON.stringify(payload));
+        console.log("Enviando sinalização para o WebSocket:", payload);
       }
     });
 
-    peerInstance.on('stream', async (stream) => {
+    peerInstance.on('stream', (stream) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
+        console.log("Stream recebido e atribuído ao remoteAudioRef");
       }
       setIsInCall(true);
-
-      const otherUserName = await getUserNameFromFirebase(userId);
-      setUsersInCall((prevUsers) => {
-        if (!prevUsers.includes(otherUserName)) {
-          return [...prevUsers, otherUserName];
-        }
-        return prevUsers;
-      });
     });
 
     peerInstance.on('close', () => {
+      console.log("Peer desconectado");
       setIsInCall(false);
     });
 
     peer.current = peerInstance;
-  }, [setUsersInCall, userId]);
+  }, [userId]);
 
   const enterVoiceChannel = async (channelName) => {
-    // Se o nome do usuário não estiver definido, abre o modal
     if (!userName) {
-      setIsUserModalOpen(true); // Abrindo o modal do chat
+      setIsUserModalOpen(true);
       return;
     }
 
@@ -64,6 +58,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
+      console.log("Local stream configurado");
     }
 
     if (!socket.current) {
@@ -75,10 +70,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
+        console.log("Mensagem recebida no WebSocket:", data);
 
-        if (data.signalData) {
+        if (data.signalData && peer.current) {
           try {
             peer.current.signal(data.signalData);
+            console.log("Sinalização recebida e enviada ao peer");
           } catch (err) {
             console.error("Erro ao sinalizar o peer:", err);
           }
@@ -97,6 +94,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       socket.current.onclose = () => {
         console.log('WebSocket desconectado');
+        socket.current = null;
+        // Aqui pode-se adicionar lógica de reconexão automática se necessário
       };
 
       socket.current.onerror = (error) => {
@@ -123,6 +122,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     setUsersInCall((prevUsers) => prevUsers.filter((user) => user !== userName));
     setIsInCall(false);
     setCurrentChannel(null);
+    console.log("Saindo do canal de voz");
   };
 
   const handleIncomingCall = useCallback(async (data) => {
@@ -135,10 +135,14 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       createPeer(false);
     }
 
-    peer.current.signal(data.signalData);
+    try {
+      peer.current.signal(data.signalData);
+      console.log("Sinalização recebida no handleIncomingCall");
+    } catch (error) {
+      console.error("Erro ao processar sinalização recebida:", error);
+    }
 
     const remoteUserName = await getUserNameFromFirebase(data.userId);
-
     setIsInCall(true);
     setUsersInCall((prevUsers) => {
       if (!prevUsers.includes(remoteUserName)) {
@@ -146,7 +150,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       }
       return prevUsers;
     });
-  }, [createPeer, setUsersInCall]);
+  }, [createPeer]);
 
   useEffect(() => {
     if (!socket.current) {
@@ -167,6 +171,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       socket.current.onclose = () => {
         console.log('WebSocket desconectado');
+        socket.current = null;
       };
     }
 
@@ -198,7 +203,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-background text-foreground">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
-  
+
       <div className="w-full max-w-md bg-background rounded-md p-4">
         <h3 className="text-lg font-semibold mb-2">Canais</h3>
         <ul className="space-y-2">
@@ -208,7 +213,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
             onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Tudo que eu quero'))}
           >
             <span className="text-foreground">Tudo que eu quero</span>
-  
+
             {currentChannel === 'Tudo que eu quero' && usersInCall.length > 0 && (
               <ul className="pl-4 pt-2 space-y-1">
                 {usersInCall.map((user, index) => (
@@ -220,14 +225,14 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
               </ul>
             )}
           </li>
-  
+
           {/* Canal 2 */}
           <li
             className={`flex flex-col items-start p-2 rounded cursor-pointer bg-muted ${currentChannel === 'Meu Plug me traz' ? 'bg-primary' : ''}`}
             onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Meu Plug me traz'))}
           >
             <span className="text-foreground">Meu Plug me traz</span>
-  
+
             {currentChannel === 'Meu Plug me traz' && usersInCall.length > 0 && (
               <ul className="pl-4 pt-2 space-y-1">
                 {usersInCall.map((user, index) => (
@@ -241,13 +246,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           </li>
         </ul>
       </div>
-  
+
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />
     </div>
   );
-  
-  
 };
 
 export default Canais;
