@@ -29,6 +29,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   
     // Adicione os eventos 'signal', 'connect', 'error', etc.
     peerInstance.on('signal', (signalData) => {
+      console.log('Signal State:', peerInstance._pc.signalingState); // Adicione logs para verificar o estado de sinalização
+      console.log('Signal Data:', signalData); // Log para ver o que está sendo transmitido
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         const payload = {
           signalData,
@@ -37,6 +39,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         socket.current.send(JSON.stringify(payload));
       }
     });
+    
   
     peerInstance.on('error', (err) => {
       console.error('Erro na conexão Peer:', err);
@@ -75,18 +78,20 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         const data = JSON.parse(message.data);
       
         if (data.signalData) {
-          if (peer.current && peer.current._pc.signalingState === 'stable') {
-            console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
-          } else if (peer.current && peer.current._pc.signalingState !== 'closed') {
-            try {
-              peer.current.signal(data.signalData);
-            } catch (err) {
-              console.error("Erro ao sinalizar o peer:", err);
+          if (peer.current && peer.current._pc) {
+            if (peer.current._pc.signalingState === 'stable') {
+              console.warn('Conexão já está em estado estável. Ignorando sinal.');
+            } else if (peer.current._pc.signalingState !== 'closed') {
+              try {
+                peer.current.signal(data.signalData);
+              } catch (err) {
+                console.error("Erro ao sinalizar o peer:", err);
+              }
+            } else {
+              console.warn('Conexão RTCPeer foi fechada.');
             }
-          } else {
-            console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
           }
-        }
+        }          
       
       
         if (data.userId) {
@@ -147,6 +152,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     } else {
       console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
     }
+    
     
 
     const remoteUserName = await getUserNameFromFirebase(data.userId);
