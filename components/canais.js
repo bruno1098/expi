@@ -31,21 +31,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         socket.current.send(JSON.stringify(payload));
       }
     });
-    if (peer.current && peer.current._pc.signalingState !== 'closed') {
-      peer.current.signal(data.signalData);
-    } else {
-      console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
-    }
-    
-    
+
     peerInstance.on('connect', () => {
       console.log('Conexão Peer estabelecida com sucesso');
     });
-    
+
     peerInstance.on('error', (err) => {
       console.error('Erro na conexão Peer:', err);
     });
-    
+
     peerInstance.on('stream', async (stream) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
@@ -63,6 +57,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     peerInstance.on('close', () => {
       setIsInCall(false);
+      console.log('Conexão Peer foi fechada.');
     });
 
     peer.current = peerInstance;
@@ -83,8 +78,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     if (!socket.current || socket.current.readyState !== WebSocket.OPEN) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
-    
-    
+
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
       };
@@ -94,11 +88,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
         if (data.signalData) {
           try {
-            // Verifica o estado do peer antes de sinalizar
             if (peer.current && peer.current._pc.signalingState === 'stable') {
               console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
-            } else {
+            } else if (peer.current && peer.current._pc.signalingState !== 'closed') {
               peer.current.signal(data.signalData);
+            } else {
+              console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
             }
           } catch (err) {
             console.error("Erro ao sinalizar o peer:", err);
@@ -158,10 +153,10 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       createPeer(false);
     }
 
-    if (navigator.mediaDevices && typeof RTCPeerConnection !== 'undefined') {
-      console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
-    } else {
+    if (peer.current && peer.current._pc.signalingState !== 'stable' && peer.current._pc.signalingState !== 'closed') {
       peer.current.signal(data.signalData);
+    } else {
+      console.warn('RTCPeerConnection já está no estado stable ou fechado. Ignorando sinal.');
     }
 
     const remoteUserName = await getUserNameFromFirebase(data.userId);
