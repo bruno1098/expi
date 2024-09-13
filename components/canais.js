@@ -29,8 +29,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   
     // Adicione os eventos 'signal', 'connect', 'error', etc.
     peerInstance.on('signal', (signalData) => {
-      console.log('Signal State:', peerInstance._pc.signalingState); // Adicione logs para verificar o estado de sinalização
-      console.log('Signal Data:', signalData); // Log para ver o que está sendo transmitido
+      console.log('Signal State:', peerInstance._pc?.signalingState); // Usando o operador ?. para garantir que _pc não seja undefined
+      console.log('Signal Data:', signalData);
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         const payload = {
           signalData,
@@ -40,7 +40,10 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       }
     });
     
-  
+    peerInstance.on('connect', () => {
+      console.log('Conexão Peer estabelecida com sucesso');
+    });
+    
     peerInstance.on('error', (err) => {
       console.error('Erro na conexão Peer:', err);
     });
@@ -52,7 +55,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   
     peer.current = peerInstance;
   }, [setUsersInCall, userId]);
-  
 
   // Entrar em um canal de voz
   const enterVoiceChannel = async (channelName) => {
@@ -76,7 +78,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
-      
+
         if (data.signalData) {
           if (peer.current && peer.current._pc) {
             if (peer.current._pc.signalingState === 'stable') {
@@ -92,8 +94,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
             }
           }
         }          
-      
-      
+
         if (data.userId) {
           const remoteUserName = await getUserNameFromFirebase(data.userId);
           setUsersInCall((prevUsers) => {
@@ -148,12 +149,14 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
 
     if (peer.current && peer.current._pc && peer.current._pc.signalingState !== 'closed') {
-      peer.current.signal(data.signalData);
+      try {
+        peer.current.signal(data.signalData);
+      } catch (err) {
+        console.error("Erro ao sinalizar o peer:", err);
+      }
     } else {
       console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
     }
-    
-    
 
     const remoteUserName = await getUserNameFromFirebase(data.userId);
 
@@ -169,7 +172,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   // Configura o WebSocket ao montar o componente
   useEffect(() => {
     if (!socket.current) {
-      socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
+      socket.current = new WebSocket('wss://serverexpi.onrender.com');
 
       socket.current.onopen = () => {
         console.log('Esperando por chamadas...');
@@ -215,6 +218,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
   };
 
+
   // Renderiza os canais de voz
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-background text-foreground">
@@ -230,24 +234,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
             <span className="text-foreground">Tudo que eu quero</span>
   
             {currentChannel === 'Tudo que eu quero' && usersInCall.length > 0 && (
-              <ul className="pl-4 pt-2 space-y-1">
-                {usersInCall.map((user, index) => (
-                  <li key={index} className="flex items-center space-x-2">
-                    <FaUser className="text-muted-foreground" />
-                    <span>{user === 'self' ? userName : user}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-  
-          <li
-            className={`flex flex-col items-start p-2 rounded cursor-pointer bg-muted ${currentChannel === 'Meu Plug me traz' ? 'bg-primary' : ''}`}
-            onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Meu Plug me traz'))}
-          >
-            <span className="text-foreground">Meu Plug me traz</span>
-  
-            {currentChannel === 'Meu Plug me traz' && usersInCall.length > 0 && (
               <ul className="pl-4 pt-2 space-y-1">
                 {usersInCall.map((user, index) => (
                   <li key={index} className="flex items-center space-x-2">
