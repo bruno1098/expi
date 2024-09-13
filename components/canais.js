@@ -152,7 +152,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       createPeer(false);
     }
 
-    if (peer.current && peer.current._pc.signalingState === 'stable') {
+    if (navigator.mediaDevices && typeof RTCPeerConnection !== 'undefined') {
       console.warn('RTCPeerConnection já está no estado stable. Ignorando sinal.');
     } else {
       peer.current.signal(data.signalData);
