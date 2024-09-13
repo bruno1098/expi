@@ -31,6 +31,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         socket.current.send(JSON.stringify(payload));
       }
     });
+    if (peer.current && peer.current._pc.signalingState !== 'closed') {
+      peer.current.signal(data.signalData);
+    } else {
+      console.warn('Conexão RTCPeer foi fechada ou não está em um estado válido');
+    }
+    
     
     peerInstance.on('connect', () => {
       console.log('Conexão Peer estabelecida com sucesso');
