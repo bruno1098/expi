@@ -67,9 +67,10 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       localAudioRef.current.srcObject = localStream;
     }
 
-    if (!socket.current) {
+    if (!socket.current || socket.current.readyState !== WebSocket.OPEN) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
-
+    
+    
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
       };
