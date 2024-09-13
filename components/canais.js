@@ -20,6 +20,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       console.error('Stream de áudio local não está disponível');
       return;
     }
+
+    // Se um peer já existir, destrua-o antes de criar um novo
+    if (peer.current) {
+      peer.current.destroy();
+    }
   
     const peerInstance = new Peer({
       initiator,
@@ -27,9 +32,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       stream: localAudioRef.current.srcObject,
     });
   
-    // Adicione os eventos 'signal', 'connect', 'error', etc.
     peerInstance.on('signal', (signalData) => {
-      console.log('Signal State:', peerInstance._pc?.signalingState); // Usando o operador ?. para garantir que _pc não seja undefined
+      console.log('Signal State:', peerInstance._pc?.signalingState); // Verificação do estado de sinalização
       console.log('Signal Data:', signalData);
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         const payload = {
@@ -43,7 +47,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     peerInstance.on('connect', () => {
       console.log('Conexão Peer estabelecida com sucesso');
     });
-    
+
     peerInstance.on('error', (err) => {
       console.error('Erro na conexão Peer:', err);
     });
@@ -78,7 +82,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
-
+      
         if (data.signalData) {
           if (peer.current && peer.current._pc) {
             if (peer.current._pc.signalingState === 'stable') {
