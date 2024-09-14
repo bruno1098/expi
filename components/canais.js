@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
-import { ref, set, get, push, runTransaction, onValue } from "firebase/database";
+import { ref, set, get, runTransaction } from "firebase/database";
 import { database } from "../pages/api/feedback"; 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; 
 import { v4 as uuidv4 } from 'uuid';
+import axios from "axios";
 
 const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
   const [isInCall, setIsInCall] = useState(false);
@@ -14,8 +14,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
   const socket = useRef(null);
-  const recognition = useRef(null);
   const callSessionIdRef = useRef(null);
+  const [conversationTranscript, setConversationTranscript] = useState([]);
+  const client = axios.create({
+    baseURL: "https://api.openai.com/v1",
+    headers: {
+      Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
 
   // Inicializa o WebSocket apenas uma vez
   useEffect(() => {
@@ -33,14 +40,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         if (data.userId !== userId) {
           if (data.signalData) {
             handleIncomingCall(data);
-          }
-
-          if (data.joined) {
-            // Já estamos ouvindo mudanças na lista de usuários
-          }
-
-          if (data.left) {
-            // Já estamos ouvindo mudanças na lista de usuários
           }
         }
       };
@@ -63,12 +62,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
   }, [userId]);
 
-  // Gerenciar desconexões abruptas
+  // Limpar o callSessionId ao fechar a aba ou atualizar a página
   useEffect(() => {
-    const handleBeforeUnload = (event) => {
-      if (isInCall) {
-        leaveVoiceChannel();
-      }
+    const handleBeforeUnload = async () => {
+      const channelRef = ref(database, `channels/${currentChannel}`);
+      await set(channelRef, null);
+      console.log("Sessão encerrada devido a atualização ou fechamento da aba.");
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -76,7 +75,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [isInCall]);
+  }, [currentChannel]);
 
   const createPeer = useCallback((initiator, signalData = null) => {
     const peerInstance = new Peer({
@@ -122,61 +121,25 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     setCurrentChannel(channelName);
 
-    // Referência para o canal no Firebase
+    const callSessionId = uuidv4();
     const channelRef = ref(database, `channels/${channelName}`);
-
-    let callSessionId;
-
-    await runTransaction(channelRef, (currentData) => {
-      if (currentData === null) {
-        // Nenhum callSessionId existe, criar um novo
-        callSessionId = uuidv4();
-        return { callSessionId, userCount: 1 };
-      } else {
-        // callSessionId existe, incrementar userCount
-        callSessionId = currentData.callSessionId;
-        return { ...currentData, userCount: (currentData.userCount || 0) + 1 };
-      }
-    });
-
+    await set(channelRef, { callSessionId });
     callSessionIdRef.current = callSessionId;
-
-    // Iniciar reconhecimento de fala
-    startSpeechRecognition();
-
-    // Adicionar o usuário à lista de usuários no Firebase
-    const usersRef = ref(database, `channels/${channelName}/users/${userId}`);
-    await set(usersRef, userName);
-
-    // Ouvir mudanças na lista de usuários
-    const usersListRef = ref(database, `channels/${channelName}/users`);
-    onValue(usersListRef, (snapshot) => {
-      const users = snapshot.val() ? Object.values(snapshot.val()) : [];
-      setUsersInCall(users);
-    });
 
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
     }
 
-    // Obter o número de usuários no canal
-    const channelSnapshot = await get(channelRef);
-    const userCount = channelSnapshot.exists() ? channelSnapshot.val().userCount : 1;
-
-    // Definir se você é o iniciador
-    if (userCount === 1) {
-      createPeer(true);
-    } else {
-      createPeer(false);
-    }
-
-    // Notifica os outros usuários que você entrou no canal
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
       socket.current.send(JSON.stringify({ userId, joined: true }));
     }
 
-    setIsInCall(true);
+    if (usersInCall.length === 0) {
+      createPeer(true);
+    }
+
+    setUsersInCall((prevUsers) => [...prevUsers, userName]);
   };
 
   const leaveVoiceChannel = async () => {
@@ -189,37 +152,16 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       socket.current.send(JSON.stringify({ userId, left: true }));
     }
 
-    // Parar reconhecimento de fala
-    stopSpeechRecognition();
-
     setIsInCall(false);
-
-    // Remover o usuário da lista de usuários no Firebase
-    const usersRef = ref(database, `channels/${currentChannel}/users/${userId}`);
-    await set(usersRef, null);
-
-    // Decrementar userCount no Firebase
+    setUsersInCall([]);
     const channelRef = ref(database, `channels/${currentChannel}`);
-
-    await runTransaction(channelRef, (currentData) => {
-      if (currentData !== null) {
-        const newUserCount = (currentData.userCount || 1) - 1;
-        if (newUserCount <= 0) {
-          // Nenhum usuário restante, remover o callSessionId
-          return null;
-        } else {
-          // Atualizar userCount
-          return { ...currentData, userCount: newUserCount };
-        }
-      } else {
-        return null;
-      }
-    });
+    await set(channelRef, null);
 
     callSessionIdRef.current = null;
     setCurrentChannel(null);
 
-    console.log("Saindo do canal de voz");
+    // Analisar a conversa com o GPT
+    analyzeConversation();
   };
 
   const handleIncomingCall = useCallback(async (data) => {
@@ -234,52 +176,46 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
   }, [createPeer]);
 
-  const startSpeechRecognition = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      console.error("API de reconhecimento de fala não suportada neste navegador.");
+  const analyzeConversation = async () => {
+    if (conversationTranscript.length === 0) {
+      console.log("Sem conversa para analisar.");
       return;
     }
 
-    recognition.current = new SpeechRecognition();
-    recognition.current.continuous = true;
-    recognition.current.interimResults = false;
-    recognition.current.lang = 'pt-BR';
+    const conversationText = conversationTranscript.join('\n');
+    const prompt = `
+    Dada a conversa a seguir, identifique quem é o cliente e quem é o atendente com base em palavras-chave, e faça uma análise do sentimento geral.
+    Determine se o cliente está satisfeito com o atendimento e se o atendente foi eficiente. Baseado nisso, gere um feedback final.
 
-    recognition.current.onresult = async (event) => {
-      // Obter o resultado atual
-      const result = event.results[event.resultIndex];
-      // Obter a melhor alternativa (primeira)
-      const transcript = result[0].transcript;
+    Conversa:
+    ${conversationText}
 
-      console.log("Transcrição:", transcript);
+    Feedback:
+    `;
 
-      if (callSessionIdRef.current) {
-        // Enviar transcrição para o Firebase em /ura/{callSessionId}/transcriptions
-        const uraSessionRef = ref(database, `ura/${callSessionIdRef.current}/transcriptions`);
-        await push(uraSessionRef, {
-          text: transcript,
-          userId: userId,
-          timestamp: Date.now(),
-        });
-      } else {
-        console.error("callSessionId não está definido.");
-      }
-    };
+    try {
+      const response = await client.post("/chat/completions", {
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: "Você é um assistente que analisa conversas de atendimento." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 200,
+        temperature: 0.7,
+      });
 
-    recognition.current.onerror = (event) => {
-      console.error("Erro no reconhecimento de fala:", event.error);
-    };
+      const feedback = response.data.choices[0].message.content.trim();
+      console.log("Feedback gerado:", feedback);
 
-    recognition.current.start();
-    console.log("Reconhecimento de fala iniciado.");
-  };
+      // Salvar o feedback no Firebase
+      const feedbackRef = ref(database, `ura/${callSessionIdRef.current}/feedback`);
+      await set(feedbackRef, {
+        feedback,
+        timestamp: Date.now(),
+      });
 
-  const stopSpeechRecognition = () => {
-    if (recognition.current) {
-      recognition.current.stop();
-      console.log("Reconhecimento de fala parado.");
+    } catch (error) {
+      console.error("Erro ao gerar feedback:", error);
     }
   };
 
@@ -301,10 +237,9 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
                 {usersInCall.map((user, index) => (
                   <li key={index} className="flex items-center space-x-2">
                     <FaUser className="text-muted-foreground" />
-                    <span>{user}</span>
+                    <span>{user === 'self' ? userName : user}</span>
                   </li>
                 ))}
-                <Button onClick={leaveVoiceChannel} className="mt-4">Sair</Button>
               </ul>
             )}
           </li>
