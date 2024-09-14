@@ -1,46 +1,22 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
-import { ref, set, get, runTransaction, onValue } from "firebase/database";
+import { ref, set, get, push, runTransaction, onValue } from "firebase/database";
 import { database } from "../pages/api/feedback"; 
 import { Button } from "@/components/ui/button";
 import { v4 as uuidv4 } from 'uuid';
-import axios from 'axios';
+import axios from 'axios'; // Import necessário para chamadas HTTP
 
 const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
   const [isInCall, setIsInCall] = useState(false);
   const [currentChannel, setCurrentChannel] = useState(null);
   const localAudioRef = useRef(null);
-  const peerConnections = useRef({}); // Gerencia múltiplos peers
+  const remoteAudioRef = useRef(null);
+  const peer = useRef(null);
   const socket = useRef(null);
   const recognition = useRef(null);
   const callSessionIdRef = useRef(null);
-  const [transcription, setTranscription] = useState(""); 
-
-  const [localStream, setLocalStream] = useState(null);
-  const [remoteStreams, setRemoteStreams] = useState({}); // Gerencia múltiplos streams remotos
-
-  // Função para obter o stream de áudio local
-  const getLocalStream = async () => {
-    if (!localStream) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        setLocalStream(stream);
-        return stream;
-      } catch (error) {
-        console.error('Erro ao obter o stream de áudio local:', error);
-      }
-    } else {
-      return localStream;
-    }
-  };
-
-  // Atualiza o srcObject do localAudioRef quando localStream muda
-  useEffect(() => {
-    if (localAudioRef.current && localStream) {
-      localAudioRef.current.srcObject = localStream;
-    }
-  }, [localAudioRef, localStream]);
+  const [transcription, setTranscription] = useState(""); // Estado para acumular transcrições
 
   // Inicializa o WebSocket apenas uma vez
   useEffect(() => {
@@ -49,61 +25,16 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
-        // Enviar mensagem de registro
-        socket.current.send(JSON.stringify({
-          type: 'register',
-          userId,
-        }));
       };
 
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
         console.log("Mensagem recebida no WebSocket:", data);
 
-        if (data.callSessionId !== callSessionIdRef.current || data.userId === userId) {
-          // Ignora mensagens não relevantes
-          return;
-        }
-
-        switch (data.type) {
-          case 'join':
-            console.log('Usuário entrou:', data.userId);
-            if (!peerConnections.current[data.userId]) {
-              const peerInstance = createPeerConnection(data.userId, false);
-              peerConnections.current[data.userId] = peerInstance;
-            }
-            break;
-
-          case 'signal':
-            const { userId: remoteUserId, targetUserId, signalData } = data;
-            if (targetUserId !== userId) {
-              // Mensagem não destinada a este cliente
-              return;
-            }
-            const peer = peerConnections.current[remoteUserId];
-            if (peer) {
-              peer.signal(signalData);
-            } else {
-              console.log('Peer não encontrado para o usuário:', remoteUserId);
-            }
-            break;
-
-          case 'leave':
-            console.log('Usuário saiu:', data.userId);
-            const peerToRemove = peerConnections.current[data.userId];
-            if (peerToRemove) {
-              peerToRemove.destroy();
-              delete peerConnections.current[data.userId];
-              setRemoteStreams(prevStreams => {
-                const updatedStreams = { ...prevStreams };
-                delete updatedStreams[data.userId];
-                return updatedStreams;
-              });
-            }
-            break;
-
-          default:
-            break;
+        if (data.userId !== userId) {
+          if (data.signalData) {
+            handleIncomingCall(data);
+          }
         }
       };
 
@@ -125,7 +56,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
   }, [userId]);
 
-  // Gerencia desconexões abruptas
+  // Gerenciar desconexões abruptas
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (isInCall) {
@@ -140,48 +71,41 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
   }, [isInCall]);
 
-  const createPeerConnection = (targetUserId, initiator) => {
+  const createPeer = useCallback((initiator, signalData = null) => {
     const peerInstance = new Peer({
       initiator,
       trickle: false,
-      stream: localStream,
-      config: {
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-      },
+      stream: localAudioRef.current.srcObject,
     });
 
-    peerInstance.on('signal', (signalData) => {
+    peerInstance.on('signal', (signal) => {
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        socket.current.send(JSON.stringify({
-          type: 'signal',
-          userId, // Nosso userId
-          targetUserId, // Destinatário
-          signalData,
-          callSessionId: callSessionIdRef.current,
-        }));
+        const payload = { signalData: signal, userId };
+        socket.current.send(JSON.stringify(payload));
       }
     });
 
     peerInstance.on('stream', (stream) => {
-      setRemoteStreams(prevStreams => ({ ...prevStreams, [targetUserId]: stream }));
-    });
-
-    peerInstance.on('close', () => {
-      console.log('Peer connection closed with', targetUserId);
-      delete peerConnections.current[targetUserId];
-      setRemoteStreams(prevStreams => {
-        const updatedStreams = { ...prevStreams };
-        delete updatedStreams[targetUserId];
-        return updatedStreams;
-      });
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream;
+      }
+      setIsInCall(true);
     });
 
     peerInstance.on('error', (err) => {
-      console.error('Peer error:', err);
+      console.error("Erro no peer:", err);
     });
 
-    return peerInstance;
-  };
+    peerInstance.on('close', () => {
+      setIsInCall(false);
+    });
+
+    if (signalData) {
+      peerInstance.signal(signalData);
+    }
+
+    peer.current = peerInstance;
+  }, [userId]);
 
   const enterVoiceChannel = async (channelName) => {
     if (!userName) {
@@ -191,15 +115,18 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     setCurrentChannel(channelName);
 
+    // Referência para o canal no Firebase
     const channelRef = ref(database, `channels/${channelName}`);
 
     let callSessionId;
 
     await runTransaction(channelRef, (currentData) => {
       if (currentData === null) {
+        // Nenhum callSessionId existe, criar um novo
         callSessionId = uuidv4();
         return { callSessionId, userCount: 1 };
       } else {
+        // callSessionId existe, incrementar userCount
         callSessionId = currentData.callSessionId;
         return { ...currentData, userCount: (currentData.userCount || 0) + 1 };
       }
@@ -207,77 +134,75 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     callSessionIdRef.current = callSessionId;
 
+    // Adicionar o usuário à lista de usuários no Firebase
     const usersRef = ref(database, `channels/${channelName}/users/${userId}`);
     await set(usersRef, userName);
 
+    // Ouvir mudanças na lista de usuários
     const usersListRef = ref(database, `channels/${channelName}/users`);
     onValue(usersListRef, (snapshot) => {
       const users = snapshot.val() ? Object.values(snapshot.val()) : [];
       setUsersInCall(users);
     });
 
-    await getLocalStream();
-
-    startSpeechRecognition();
-
-    const usersSnapshot = await get(usersListRef);
-    const usersInChannel = usersSnapshot.val() ? usersSnapshot.val() : {};
-
-    for (const otherUserId in usersInChannel) {
-      if (otherUserId !== userId && !peerConnections.current[otherUserId]) {
-        const peerInstance = createPeerConnection(otherUserId, true);
-        peerConnections.current[otherUserId] = peerInstance;
-      }
+    // Obter o stream de áudio local
+    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (localAudioRef.current) {
+      localAudioRef.current.srcObject = localStream;
     }
 
+    // Iniciar reconhecimento de fala
+    startSpeechRecognition();
+
+    // Obter o número de usuários no canal
+    const channelSnapshot = await get(channelRef);
+    const userCount = channelSnapshot.exists() ? channelSnapshot.val().userCount : 1;
+
+    // Definir se você é o iniciador
+    if (userCount === 1) {
+      createPeer(true);
+    } else {
+      createPeer(false);
+    }
+
+    // Notifica os outros usuários que você entrou no canal
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-      socket.current.send(JSON.stringify({
-        type: 'join',
-        userId,
-        callSessionId: callSessionIdRef.current,
-      }));
+      socket.current.send(JSON.stringify({ userId, joined: true }));
     }
 
     setIsInCall(true);
   };
 
   const leaveVoiceChannel = async () => {
-    if (localStream) {
-      localStream.getTracks().forEach((track) => {
-        track.stop();
-      });
-      setLocalStream(null);
+    if (peer.current) {
+      peer.current.destroy();
+      peer.current = null;
     }
-
-    for (const peer of Object.values(peerConnections.current)) {
-      peer.destroy();
-    }
-    peerConnections.current = {};
-    setRemoteStreams({});
 
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-      socket.current.send(JSON.stringify({
-        type: 'leave',
-        userId,
-        callSessionId: callSessionIdRef.current,
-      }));
+      socket.current.send(JSON.stringify({ userId, left: true }));
     }
 
+    // Parar reconhecimento de fala
     stopSpeechRecognition();
 
     setIsInCall(false);
 
+    // Remover o usuário da lista de usuários no Firebase
     const usersRef = ref(database, `channels/${currentChannel}/users/${userId}`);
     await set(usersRef, null);
 
+    // Decrementar userCount no Firebase
     const channelRef = ref(database, `channels/${currentChannel}`);
 
     await runTransaction(channelRef, (currentData) => {
       if (currentData !== null) {
         const newUserCount = (currentData.userCount || 1) - 1;
         if (newUserCount <= 0) {
+          // Nenhum usuário restante, remover o callSessionId
           return null;
         } else {
+          // Atualizar userCount
           return { ...currentData, userCount: newUserCount };
         }
       } else {
@@ -285,17 +210,19 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       }
     });
 
-    const currentCallSessionId = callSessionIdRef.current;
+    const currentCallSessionId = callSessionIdRef.current; // Armazena o ID atual antes de limpar
     callSessionIdRef.current = null;
     setCurrentChannel(null);
 
     console.log("Saindo do canal de voz");
 
+    // Enviar a transcrição acumulada para a análise do GPT
     if (transcription.trim() !== "") {
       try {
         const feedback = await analyzeConversationWithGPT(transcription);
         console.log("Feedback gerado:", feedback);
 
+        // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
         const uraRef = ref(database, `ura/${currentCallSessionId}/feedback`);
         await set(uraRef, feedback);
         console.log("Feedback salvo no Firebase.");
@@ -304,7 +231,39 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       }
     }
 
+    // Limpar a transcrição acumulada
     setTranscription("");
+
+    // Atualizar a página (opcional, se desejar recarregar)
+    // window.location.reload();
+  };
+
+  const handleIncomingCall = useCallback(async (data) => {
+    if (!peer.current) {
+      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (localAudioRef.current) {
+        localAudioRef.current.srcObject = localStream;
+      }
+      createPeer(false, data.signalData);
+    } else {
+      peer.current.signal(data.signalData);
+    }
+  }, [createPeer]);
+
+  const getUserNameFromFirebase = async (userId) => {
+    try {
+      const userRef = ref(database, `users/${userId}`);
+      const snapshot = await get(userRef);
+
+      if (snapshot.exists()) {
+        return snapshot.val().name;
+      } else {
+        return "Outro Usuário";
+      }
+    } catch (error) {
+      console.error("Erro ao buscar o nome do usuário:", error);
+      return "Outro Usuário";
+    }
   };
 
   // Funções para reconhecimento de fala
@@ -336,11 +295,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       console.error("Erro no reconhecimento de fala:", event.error);
     };
 
-    recognition.current.onend = () => {
-      // Reinicia o reconhecimento se necessário
-      recognition.current.start();
-    };
-
     recognition.current.start();
     console.log("Reconhecimento de fala iniciado.");
   };
@@ -354,12 +308,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
   // Função para analisar a conversa com o GPT
   const analyzeConversationWithGPT = async (conversation) => {
-    const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-
-    if (!OPENAI_API_KEY) {
-      console.error("OpenAI API Key não está definida.");
-      throw new Error("OpenAI API Key não está definida.");
-    }
+    const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
 
     try {
       const response = await axios.post(
@@ -398,19 +347,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
   };
 
-  // Componente para renderizar streams remotos
-  const RemoteAudio = ({ stream }) => {
-    const audioRef = useRef();
-
-    useEffect(() => {
-      if (audioRef.current && stream) {
-        audioRef.current.srcObject = stream;
-      }
-    }, [stream]);
-
-    return <audio ref={audioRef} autoPlay playsInline />;
-  };
-
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-background text-foreground">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
@@ -439,14 +375,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         </ul>
       </div>
 
-      {/* Elemento de áudio para o stream local */}
-      <audio ref={localAudioRef} autoPlay playsInline muted />
-
-      {/* Renderiza os streams remotos */}
-      {Object.values(remoteStreams).map((stream, index) => (
-        <RemoteAudio key={index} stream={stream} />
-      ))}
-
+      <audio ref={localAudioRef} autoPlay muted />
+      <audio ref={remoteAudioRef} autoPlay />
     </div>
   );
 };
