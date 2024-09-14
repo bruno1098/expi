@@ -1,5 +1,3 @@
-// File: components/Canais.js
-
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
@@ -37,8 +35,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           if (data.signalData) {
             handleIncomingCall(data);
           }
-
-          // As mudanças na lista de usuários já estão sendo ouvidas via Firebase
         }
       };
 
@@ -220,18 +216,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     console.log("Saindo do canal de voz");
 
-    // Enviar a transcrição acumulada para a API de análise
+    // Enviar a transcrição acumulada para a análise do GPT
     if (transcription.trim() !== "") {
       try {
-        const response = await axios.post("/api/analyze-audio", { 
-          transcription, 
-          callSessionId: currentCallSessionId 
-        });
-        console.log("Feedback gerado:", response.data.feedback);
+        const feedback = await analyzeConversationWithGPT(transcription);
+        console.log("Feedback gerado:", feedback);
 
         // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
         const uraRef = ref(database, `ura/${currentCallSessionId}/feedback`);
-        await set(uraRef, response.data.feedback);
+        await set(uraRef, feedback);
         console.log("Feedback salvo no Firebase.");
       } catch (error) {
         console.error("Erro ao enviar transcrição para análise:", error);
@@ -288,15 +281,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     recognition.current.lang = 'pt-BR';
 
     recognition.current.onresult = async (event) => {
-      // Obter o resultado atual
       const result = event.results[event.resultIndex];
-      // Obter a melhor alternativa (primeira)
       const transcript = result[0].transcript.trim();
 
       console.log("Transcrição:", transcript);
 
       if (transcript) {
-        // Acumular a transcrição localmente
         setTranscription((prev) => prev + " " + transcript);
       }
     };
@@ -313,6 +303,47 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     if (recognition.current) {
       recognition.current.stop();
       console.log("Reconhecimento de fala parado.");
+    }
+  };
+
+  // Função para analisar a conversa com o GPT
+  const analyzeConversationWithGPT = async (conversation) => {
+    const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
+
+    try {
+      const response = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: "Você é um assistente que analisa conversas de atendimento ao cliente." },
+            { role: "user", content: `
+              Analise a seguinte conversa de atendimento ao cliente. Identifique quem é o cliente e quem é o atendente com base em palavras-chave.
+              Analise o sentimento da conversa e determine se o cliente foi atendido de forma correta, se ficou satisfeito ou insatisfeito, e forneça feedback sobre como melhorar o atendimento.
+
+              Conversa:
+              ${conversation}
+
+              Análise:
+            ` },
+          ],
+          max_tokens: 300,
+          temperature: 0.7,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+        }
+      );
+
+      const analysis = response.data.choices[0].message.content.trim();
+      return analysis;
+
+    } catch (error) {
+      console.error("Erro ao analisar a conversa com o GPT:", error);
+      throw new Error("Erro ao analisar a conversa.");
     }
   };
 
