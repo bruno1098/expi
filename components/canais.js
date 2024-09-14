@@ -1,3 +1,5 @@
+// File: components/Canais.js
+
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
@@ -5,7 +7,7 @@ import { ref, set, get, push, runTransaction, onValue } from "firebase/database"
 import { database } from "../pages/api/feedback"; 
 import { Button } from "@/components/ui/button";
 import { v4 as uuidv4 } from 'uuid';
-import axios from 'axios'; // Assegure-se de importar o axios
+import axios from 'axios'; // Import necessário para chamadas HTTP
 
 const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
   const [isInCall, setIsInCall] = useState(false);
@@ -147,6 +149,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       setUsersInCall(users);
     });
 
+    // Obter o stream de áudio local
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
@@ -211,6 +214,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       }
     });
 
+    const currentCallSessionId = callSessionIdRef.current; // Armazena o ID atual antes de limpar
     callSessionIdRef.current = null;
     setCurrentChannel(null);
 
@@ -219,12 +223,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     // Enviar a transcrição acumulada para a API de análise
     if (transcription.trim() !== "") {
       try {
-        const response = await axios.post("/api/analyze-audio", { transcription });
-        console.log("Feedback gerado:", response.data);
+        const response = await axios.post("/api/analyze-audio", { 
+          transcription, 
+          callSessionId: currentCallSessionId 
+        });
+        console.log("Feedback gerado:", response.data.feedback);
 
-        // Salvar o feedback no Firebase em /ura
-        const uraRef = ref(database, `ura/${callSessionIdRef.current}/feedback`);
-        await set(uraRef, response.data);
+        // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
+        const uraRef = ref(database, `ura/${currentCallSessionId}/feedback`);
+        await set(uraRef, response.data.feedback);
         console.log("Feedback salvo no Firebase.");
       } catch (error) {
         console.error("Erro ao enviar transcrição para análise:", error);
@@ -233,6 +240,9 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     // Limpar a transcrição acumulada
     setTranscription("");
+
+    // Atualizar a página (opcional, se desejar recarregar)
+    // window.location.reload();
   };
 
   const handleIncomingCall = useCallback(async (data) => {
