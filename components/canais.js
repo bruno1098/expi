@@ -49,6 +49,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
+        // Enviar mensagem de registro
+        socket.current.send(JSON.stringify({
+          type: 'register',
+          userId,
+        }));
       };
 
       socket.current.onmessage = async (message) => {
@@ -70,7 +75,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
             break;
 
           case 'signal':
-            const { userId: remoteUserId, signalData } = data;
+            const { userId: remoteUserId, targetUserId, signalData } = data;
+            if (targetUserId !== userId) {
+              // Mensagem não destinada a este cliente
+              return;
+            }
             const peer = peerConnections.current[remoteUserId];
             if (peer) {
               peer.signal(signalData);
