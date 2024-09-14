@@ -715,5 +715,3 @@ function SendIcon(props: React.JSX.IntrinsicAttributes & React.SVGProps<SVGSVGEl
     </svg>
   );
 }
-
-
