@@ -16,9 +16,9 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   const socket = useRef(null);
   const recognition = useRef(null);
   const callSessionIdRef = useRef(null);
-  const [transcription, setTranscription] = useState(""); // Estado para acumular transcrições
+  const [transcription, setTranscription] = useState(""); 
 
-  // Inicializa o WebSocket apenas uma vez
+
   useEffect(() => {
     if (!socket.current) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
@@ -30,13 +30,22 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
         console.log("Mensagem recebida no WebSocket:", data);
-
-        if (data.userId !== userId) {
+      
+        // Verifique se o callSessionId da mensagem corresponde ao atual
+        if (
+          data.callSessionId === callSessionIdRef.current &&
+          data.userId !== userId
+        ) {
           if (data.signalData) {
             handleIncomingCall(data);
+          } else if (data.joined) {
+            // Trate o caso de um usuário entrando
+          } else if (data.left) {
+            // Trate o caso de um usuário saindo
           }
         }
       };
+      
 
       socket.current.onerror = (error) => {
         console.error('Erro no WebSocket:', error);
@@ -80,10 +89,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     peerInstance.on('signal', (signal) => {
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        const payload = { signalData: signal, userId };
+        const payload = {
+          signalData: signal,
+          userId,
+          callSessionId: callSessionIdRef.current, // Inclua o callSessionId aqui
+        };
         socket.current.send(JSON.stringify(payload));
       }
     });
+    
 
     peerInstance.on('stream', (stream) => {
       if (remoteAudioRef.current) {
@@ -91,6 +105,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       }
       setIsInCall(true);
     });
+    
 
     peerInstance.on('error', (err) => {
       console.error("Erro no peer:", err);
@@ -146,10 +161,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     });
 
     // Obter o stream de áudio local
-    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    if (localAudioRef.current) {
-      localAudioRef.current.srcObject = localStream;
-    }
+    // Ao obter o stream local
+const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+if (localAudioRef.current) {
+  localAudioRef.current.srcObject = localStream;
+}
+
 
     // Iniciar reconhecimento de fala
     startSpeechRecognition();
@@ -166,9 +183,17 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
 
     // Notifica os outros usuários que você entrou no canal
-    if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-      socket.current.send(JSON.stringify({ userId, joined: true }));
-    }
+    // Ao entrar no canal
+if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+  socket.current.send(JSON.stringify({
+    userId,
+    joined: true,
+    callSessionId: callSessionIdRef.current, // Inclua aqui também
+  }));
+}
+
+
+
 
     setIsInCall(true);
   };
@@ -179,9 +204,14 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       peer.current = null;
     }
 
-    if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-      socket.current.send(JSON.stringify({ userId, left: true }));
-    }
+    // Ao sair do canal
+if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+  socket.current.send(JSON.stringify({
+    userId,
+    left: true,
+    callSessionId: callSessionIdRef.current, // Inclua aqui também
+  }));
+}
 
     // Parar reconhecimento de fala
     stopSpeechRecognition();
@@ -375,8 +405,10 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         </ul>
       </div>
 
-      <audio ref={localAudioRef} autoPlay muted />
-      <audio ref={remoteAudioRef} autoPlay />
+ 
+      <audio ref={localAudioRef} autoPlay playsInline muted />
+      <audio ref={remoteAudioRef} autoPlay playsInline />
+
     </div>
   );
 };
