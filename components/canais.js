@@ -5,7 +5,7 @@ import { ref, set, get, push, runTransaction, onValue } from "firebase/database"
 import { database } from "../pages/api/feedback"; 
 import { Button } from "@/components/ui/button";
 import { v4 as uuidv4 } from 'uuid';
-import axios from 'axios'; // Import necessário para chamadas HTTP
+import axios from 'axios';
 
 const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
   const [isInCall, setIsInCall] = useState(false);
@@ -18,7 +18,39 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   const callSessionIdRef = useRef(null);
   const [transcription, setTranscription] = useState(""); 
 
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
 
+  // Função para obter o stream de áudio local
+  const getLocalStream = async () => {
+    if (!localStream) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setLocalStream(stream);
+        return stream;
+      } catch (error) {
+        console.error('Erro ao obter o stream de áudio local:', error);
+      }
+    } else {
+      return localStream;
+    }
+  };
+
+  // Efeito para atualizar o srcObject do localAudioRef quando localStream mudar
+  useEffect(() => {
+    if (localAudioRef.current && localStream) {
+      localAudioRef.current.srcObject = localStream;
+    }
+  }, [localAudioRef, localStream]);
+
+  // Efeito para atualizar o srcObject do remoteAudioRef quando remoteStream mudar
+  useEffect(() => {
+    if (remoteAudioRef.current && remoteStream) {
+      remoteAudioRef.current.srcObject = remoteStream;
+    }
+  }, [remoteAudioRef, remoteStream]);
+
+  // Inicializa o WebSocket apenas uma vez
   useEffect(() => {
     if (!socket.current) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
@@ -31,7 +63,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         const data = JSON.parse(message.data);
         console.log("Mensagem recebida no WebSocket:", data);
       
-        // Verifique se o callSessionId da mensagem corresponde ao atual
+        // Verifica se o callSessionId da mensagem corresponde ao atual
         if (
           data.callSessionId === callSessionIdRef.current &&
           data.userId !== userId
@@ -39,13 +71,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           if (data.signalData) {
             handleIncomingCall(data);
           } else if (data.joined) {
-            // Trate o caso de um usuário entrando
+            console.log('Usuário entrou:', data.userId);
           } else if (data.left) {
-            // Trate o caso de um usuário saindo
+            console.log('Usuário saiu:', data.userId);
           }
         }
       };
-      
 
       socket.current.onerror = (error) => {
         console.error('Erro no WebSocket:', error);
@@ -65,7 +96,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
   }, [userId]);
 
-  // Gerenciar desconexões abruptas
+  // Gerencia desconexões abruptas
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (isInCall) {
@@ -80,35 +111,47 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
   }, [isInCall]);
 
-  const createPeer = useCallback((initiator, signalData = null) => {
+  const createPeer = useCallback((initiator, signalData = null, stream) => {
+    if (!stream) {
+      console.error('Stream local não está disponível no createPeer');
+      return;
+    }
+
+    console.log(`Criando peer. Initiator: ${initiator}`);
+
     const peerInstance = new Peer({
       initiator,
       trickle: false,
-      stream: localAudioRef.current.srcObject,
+      stream: stream,
+      config: {
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      },
     });
 
     peerInstance.on('signal', (signal) => {
+      console.log('Peer signal event:', signal);
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         const payload = {
           signalData: signal,
           userId,
-          callSessionId: callSessionIdRef.current, // Inclua o callSessionId aqui
+          callSessionId: callSessionIdRef.current,
         };
         socket.current.send(JSON.stringify(payload));
       }
     });
-    
 
     peerInstance.on('stream', (stream) => {
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = stream;
-      }
+      console.log('Peer stream event:', stream);
+      setRemoteStream(stream);
       setIsInCall(true);
     });
-    
+
+    peerInstance.on('connect', () => {
+      console.log('Peer connected');
+    });
 
     peerInstance.on('error', (err) => {
-      console.error("Erro no peer:", err);
+      console.error('Peer error:', err);
     });
 
     peerInstance.on('close', () => {
@@ -116,6 +159,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     });
 
     if (signalData) {
+      console.log('Signal data provided, signaling peer');
       peerInstance.signal(signalData);
     }
 
@@ -161,12 +205,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     });
 
     // Obter o stream de áudio local
-    // Ao obter o stream local
-const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-if (localAudioRef.current) {
-  localAudioRef.current.srcObject = localStream;
-}
-
+    const stream = await getLocalStream();
 
     // Iniciar reconhecimento de fala
     startSpeechRecognition();
@@ -176,24 +215,17 @@ if (localAudioRef.current) {
     const userCount = channelSnapshot.exists() ? channelSnapshot.val().userCount : 1;
 
     // Definir se você é o iniciador
-    if (userCount === 1) {
-      createPeer(true);
-    } else {
-      createPeer(false);
+    const isInitiator = userCount === 1;
+    await createPeer(isInitiator, null, stream);
+
+    // Notificar os outros usuários que você entrou no canal
+    if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+      socket.current.send(JSON.stringify({
+        userId,
+        joined: true,
+        callSessionId: callSessionIdRef.current,
+      }));
     }
-
-    // Notifica os outros usuários que você entrou no canal
-    // Ao entrar no canal
-if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-  socket.current.send(JSON.stringify({
-    userId,
-    joined: true,
-    callSessionId: callSessionIdRef.current, // Inclua aqui também
-  }));
-}
-
-
-
 
     setIsInCall(true);
   };
@@ -204,14 +236,30 @@ if (socket.current && socket.current.readyState === WebSocket.OPEN) {
       peer.current = null;
     }
 
-    // Ao sair do canal
-if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-  socket.current.send(JSON.stringify({
-    userId,
-    left: true,
-    callSessionId: callSessionIdRef.current, // Inclua aqui também
-  }));
-}
+    // Stop local stream
+    if (localStream) {
+      localStream.getTracks().forEach((track) => {
+        track.stop();
+      });
+      setLocalStream(null);
+    }
+
+    // Stop remote stream
+    if (remoteStream) {
+      remoteStream.getTracks().forEach((track) => {
+        track.stop();
+      });
+      setRemoteStream(null);
+    }
+
+    // Notificar os outros usuários que você saiu do canal
+    if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+      socket.current.send(JSON.stringify({
+        userId,
+        left: true,
+        callSessionId: callSessionIdRef.current,
+      }));
+    }
 
     // Parar reconhecimento de fala
     stopSpeechRecognition();
@@ -246,7 +294,7 @@ if (socket.current && socket.current.readyState === WebSocket.OPEN) {
 
     console.log("Saindo do canal de voz");
 
-    // Enviar a transcrição acumulada para a análise do GPT
+    // Enviar a transcrição acumulada para a análise do GPT (opcional)
     if (transcription.trim() !== "") {
       try {
         const feedback = await analyzeConversationWithGPT(transcription);
@@ -263,40 +311,21 @@ if (socket.current && socket.current.readyState === WebSocket.OPEN) {
 
     // Limpar a transcrição acumulada
     setTranscription("");
-
-    // Atualizar a página (opcional, se desejar recarregar)
-    // window.location.reload();
   };
 
   const handleIncomingCall = useCallback(async (data) => {
+    console.log('handleIncomingCall:', data);
     if (!peer.current) {
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (localAudioRef.current) {
-        localAudioRef.current.srcObject = localStream;
-      }
-      createPeer(false, data.signalData);
+      console.log('Criando novo peer no handleIncomingCall');
+      const stream = await getLocalStream();
+      await createPeer(false, data.signalData, stream);
     } else {
+      console.log('Adicionando sinal ao peer existente');
       peer.current.signal(data.signalData);
     }
-  }, [createPeer]);
+  }, [createPeer, getLocalStream]);
 
-  const getUserNameFromFirebase = async (userId) => {
-    try {
-      const userRef = ref(database, `users/${userId}`);
-      const snapshot = await get(userRef);
-
-      if (snapshot.exists()) {
-        return snapshot.val().name;
-      } else {
-        return "Outro Usuário";
-      }
-    } catch (error) {
-      console.error("Erro ao buscar o nome do usuário:", error);
-      return "Outro Usuário";
-    }
-  };
-
-  // Funções para reconhecimento de fala
+  // Funções para reconhecimento de fala (opcional)
   const startSpeechRecognition = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -336,7 +365,7 @@ if (socket.current && socket.current.readyState === WebSocket.OPEN) {
     }
   };
 
-  // Função para analisar a conversa com o GPT
+  // Função para analisar a conversa com o GPT (opcional)
   const analyzeConversationWithGPT = async (conversation) => {
     const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
 
@@ -405,7 +434,7 @@ if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         </ul>
       </div>
 
- 
+      {/* Elementos de áudio para capturar e reproduzir o áudio */}
       <audio ref={localAudioRef} autoPlay playsInline muted />
       <audio ref={remoteAudioRef} autoPlay playsInline />
 
