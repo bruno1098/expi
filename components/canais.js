@@ -141,6 +141,9 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     callSessionIdRef.current = callSessionId;
 
+    // Iniciar reconhecimento de fala
+    startSpeechRecognition();
+
     // Adicionar o usuário à lista de usuários no Firebase
     const usersRef = ref(database, `channels/${channelName}/users/${userId}`);
     await set(usersRef, userName);
@@ -235,6 +238,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
+      console.error("API de reconhecimento de fala não suportada neste navegador.");
       return;
     }
 
@@ -252,12 +256,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       console.log("Transcrição:", transcript);
 
       if (callSessionIdRef.current) {
+        // Enviar transcrição para o Firebase em /ura/{callSessionId}/transcriptions
         const uraSessionRef = ref(database, `ura/${callSessionIdRef.current}/transcriptions`);
         await push(uraSessionRef, {
           text: transcript,
           userId: userId,
           timestamp: Date.now(),
         });
+      } else {
+        console.error("callSessionId não está definido.");
       }
     };
 
@@ -266,11 +273,13 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
 
     recognition.current.start();
+    console.log("Reconhecimento de fala iniciado.");
   };
 
   const stopSpeechRecognition = () => {
     if (recognition.current) {
       recognition.current.stop();
+      console.log("Reconhecimento de fala parado.");
     }
   };
 
