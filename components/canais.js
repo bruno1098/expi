@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
-import { ref, set, get, push } from "firebase/database";
+import { ref, set, get, push, runTransaction, onValue } from "firebase/database";
 import { database } from "../pages/api/feedback"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; 
@@ -10,7 +10,6 @@ import { v4 as uuidv4 } from 'uuid';
 const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
   const [isInCall, setIsInCall] = useState(false);
   const [currentChannel, setCurrentChannel] = useState(null);
-  const sessionIdRef = useRef(null);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const peer = useRef(null);
@@ -37,18 +36,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           }
 
           if (data.joined) {
-            const remoteUserName = await getUserNameFromFirebase(data.userId);
-            setUsersInCall((prevUsers) => {
-              if (!prevUsers.includes(remoteUserName)) {
-                return [...prevUsers, remoteUserName];
-              }
-              return prevUsers;
-            });
+            // Já estamos ouvindo mudanças na lista de usuários
           }
 
           if (data.left) {
-            const remoteUserName = await getUserNameFromFirebase(data.userId);
-            setUsersInCall((prevUsers) => prevUsers.filter((user) => user !== remoteUserName));
+            // Já estamos ouvindo mudanças na lista de usuários
           }
         }
       };
@@ -71,12 +63,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
   }, [userId]);
 
-  // Limpar o callSessionId ao fechar a aba ou atualizar a página
+  // Gerenciar desconexões abruptas
   useEffect(() => {
-    const handleBeforeUnload = async () => {
-      const channelRef = ref(database, `channels/${currentChannel}`);
-      await set(channelRef, null);
-      console.log("Sessão encerrada devido a atualização ou fechamento da aba.");
+    const handleBeforeUnload = (event) => {
+      if (isInCall) {
+        leaveVoiceChannel();
+      }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -84,7 +76,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [currentChannel]);
+  }, [isInCall]);
 
   const createPeer = useCallback((initiator, signalData = null) => {
     const peerInstance = new Peer({
@@ -130,28 +122,58 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     setCurrentChannel(channelName);
 
-    // Criar sempre um novo callSessionId ao entrar no canal
-    const callSessionId = uuidv4();
+    // Referência para o canal no Firebase
     const channelRef = ref(database, `channels/${channelName}`);
-    await set(channelRef, { callSessionId });
+
+    let callSessionId;
+
+    await runTransaction(channelRef, (currentData) => {
+      if (currentData === null) {
+        // Nenhum callSessionId existe, criar um novo
+        callSessionId = uuidv4();
+        return { callSessionId, userCount: 1 };
+      } else {
+        // callSessionId existe, incrementar userCount
+        callSessionId = currentData.callSessionId;
+        return { ...currentData, userCount: (currentData.userCount || 0) + 1 };
+      }
+    });
+
     callSessionIdRef.current = callSessionId;
+
+    // Adicionar o usuário à lista de usuários no Firebase
+    const usersRef = ref(database, `channels/${channelName}/users/${userId}`);
+    await set(usersRef, userName);
+
+    // Ouvir mudanças na lista de usuários
+    const usersListRef = ref(database, `channels/${channelName}/users`);
+    onValue(usersListRef, (snapshot) => {
+      const users = snapshot.val() ? Object.values(snapshot.val()) : [];
+      setUsersInCall(users);
+    });
 
     const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (localAudioRef.current) {
       localAudioRef.current.srcObject = localStream;
     }
 
-    startSpeechRecognition();
+    // Obter o número de usuários no canal
+    const channelSnapshot = await get(channelRef);
+    const userCount = channelSnapshot.exists() ? channelSnapshot.val().userCount : 1;
 
+    // Definir se você é o iniciador
+    if (userCount === 1) {
+      createPeer(true);
+    } else {
+      createPeer(false);
+    }
+
+    // Notifica os outros usuários que você entrou no canal
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
       socket.current.send(JSON.stringify({ userId, joined: true }));
     }
 
-    if (usersInCall.length === 0) {
-      createPeer(true);
-    }
-
-    setUsersInCall((prevUsers) => [...prevUsers, userName]);
+    setIsInCall(true);
   };
 
   const leaveVoiceChannel = async () => {
@@ -164,16 +186,37 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       socket.current.send(JSON.stringify({ userId, left: true }));
     }
 
+    // Parar reconhecimento de fala
     stopSpeechRecognition();
-    setUsersInCall((prevUsers) => prevUsers.filter((user) => user !== userName));
-    setIsInCall(false);
-    setCurrentChannel(null);
 
+    setIsInCall(false);
+
+    // Remover o usuário da lista de usuários no Firebase
+    const usersRef = ref(database, `channels/${currentChannel}/users/${userId}`);
+    await set(usersRef, null);
+
+    // Decrementar userCount no Firebase
     const channelRef = ref(database, `channels/${currentChannel}`);
-    await set(channelRef, null);
+
+    await runTransaction(channelRef, (currentData) => {
+      if (currentData !== null) {
+        const newUserCount = (currentData.userCount || 1) - 1;
+        if (newUserCount <= 0) {
+          // Nenhum usuário restante, remover o callSessionId
+          return null;
+        } else {
+          // Atualizar userCount
+          return { ...currentData, userCount: newUserCount };
+        }
+      } else {
+        return null;
+      }
+    });
 
     callSessionIdRef.current = null;
-    window.location.reload();
+    setCurrentChannel(null);
+
+    console.log("Saindo do canal de voz");
   };
 
   const handleIncomingCall = useCallback(async (data) => {
@@ -186,75 +229,44 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     } else {
       peer.current.signal(data.signalData);
     }
-
-    const remoteUserName = await getUserNameFromFirebase(data.userId);
-    setUsersInCall((prevUsers) => {
-      if (!prevUsers.includes(remoteUserName)) {
-        return [...prevUsers, remoteUserName];
-      }
-      return prevUsers;
-    });
   }, [createPeer]);
 
-  const getUserNameFromFirebase = async (userId) => {
-    try {
-      const userRef = ref(database, `users/${userId}`);
-      const snapshot = await get(userRef);
+  const startSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-      if (snapshot.exists()) {
-        return snapshot.val().name;
-      } else {
-        return "Outro Usuário";
+    if (!SpeechRecognition) {
+      return;
+    }
+
+    recognition.current = new SpeechRecognition();
+    recognition.current.continuous = true;
+    recognition.current.interimResults = false;
+    recognition.current.lang = 'pt-BR';
+
+    recognition.current.onresult = async (event) => {
+      // Obter o resultado atual
+      const result = event.results[event.resultIndex];
+      // Obter a melhor alternativa (primeira)
+      const transcript = result[0].transcript;
+
+      console.log("Transcrição:", transcript);
+
+      if (callSessionIdRef.current) {
+        const uraSessionRef = ref(database, `ura/${callSessionIdRef.current}/transcriptions`);
+        await push(uraSessionRef, {
+          text: transcript,
+          userId: userId,
+          timestamp: Date.now(),
+        });
       }
-    } catch (error) {
-      console.error("Erro ao buscar o nome do usuário:", error);
-      return "Outro Usuário";
-    }
+    };
+
+    recognition.current.onerror = (event) => {
+      console.error("Erro no reconhecimento de fala:", event.error);
+    };
+
+    recognition.current.start();
   };
-
-  // Funções para reconhecimento de fala
-const startSpeechRecognition = () => {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if (!SpeechRecognition) {
-    console.error("API de reconhecimento de fala não suportada neste navegador.");
-    return;
-  }
-
-  recognition.current = new SpeechRecognition();
-  recognition.current.continuous = true;
-  recognition.current.interimResults = false;
-  recognition.current.lang = 'pt-BR';
-
-  recognition.current.onresult = async (event) => {
-    // Obter o resultado atual
-    const result = event.results[event.resultIndex];
-    // Obter a melhor alternativa (primeira)
-    const transcript = result[0].transcript;
-
-    console.log("Transcrição:", transcript);
-
-    if (callSessionIdRef.current) {
-      // Enviar transcrição para o Firebase em /ura/{callSessionId}/transcriptions
-      const uraSessionRef = ref(database, `ura/${callSessionIdRef.current}/transcriptions`);
-      await push(uraSessionRef, {
-        text: transcript,
-        userId: userId,
-        timestamp: Date.now(),
-      });
-    } else {
-      console.error("callSessionId não está definido.");
-    }
-  };
-
-  recognition.current.onerror = (event) => {
-    console.error("Erro no reconhecimento de fala:", event.error);
-  };
-
-  recognition.current.start();
-  console.log("Reconhecimento de fala iniciado.");
-};
-
 
   const stopSpeechRecognition = () => {
     if (recognition.current) {
@@ -280,10 +292,10 @@ const startSpeechRecognition = () => {
                 {usersInCall.map((user, index) => (
                   <li key={index} className="flex items-center space-x-2">
                     <FaUser className="text-muted-foreground" />
-                    <span>{user === 'self' ? userName : user}</span>
-                    <Button onClick={leaveVoiceChannel} className="mt-4">Sair</Button>
+                    <span>{user}</span>
                   </li>
                 ))}
+                <Button onClick={leaveVoiceChannel} className="mt-4">Sair</Button>
               </ul>
             )}
           </li>
