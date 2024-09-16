@@ -201,71 +201,80 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   };
 
   const leaveVoiceChannel = async () => {
+    if (!callSessionIdRef.current) {
+      console.log("Nenhuma sessão ativa para sair.");
+      return;
+    }
+  
     if (peer.current) {
       peer.current.destroy();
       peer.current = null;
     }
-
+  
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
     }
-
+  
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
       socket.current.send(JSON.stringify({ userId, left: true }));
     }
-
+  
     // Parar reconhecimento de fala
     stopSpeechRecognition();
-
+  
     setIsInCall(false);
-
+  
     // Remover o usuário da lista de usuários no Firebase
     const usersRef = ref(database, `channels/${currentChannel}/users/${userId}`);
     await set(usersRef, null);
-
+  
     // Decrementar userCount no Firebase
     const channelRef = ref(database, `channels/${currentChannel}`);
-
     await runTransaction(channelRef, (currentData) => {
       if (currentData !== null) {
         const newUserCount = (currentData.userCount || 1) - 1;
         if (newUserCount <= 0) {
-          // Nenhum usuário restante, remover o callSessionId
-          return null;
+          return null; // Remover canal se não houver usuários
         } else {
-          // Atualizar userCount
           return { ...currentData, userCount: newUserCount };
         }
-      } else {
-        return null;
       }
+      return currentData;
     });
-
+  
     const currentCallSessionId = callSessionIdRef.current; // Armazena o ID atual antes de limpar
-    callSessionIdRef.current = null;
-    setCurrentChannel(null);
-
+    callSessionIdRef.current = null; // Limpar o ID da sessão
+  
     console.log("Saindo do canal de voz");
-
-    // Enviar a transcrição acumulada para a análise do GPT
+  
+    // Enviar a transcrição acumulada para a análise do GPT apenas uma vez
     if (transcription.trim() !== "") {
       try {
         const feedback = await analyzeConversationWithGPT(transcription);
         console.log("Feedback gerado:", feedback);
-
-        // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
+  
+        // Verifique se o feedback já foi enviado
         const uraRef = ref(database, `ura/${currentCallSessionId}/feedback`);
-        await set(uraRef, feedback);
-        console.log("Feedback salvo no Firebase.");
+        const feedbackSnapshot = await get(uraRef);
+        
+        if (!feedbackSnapshot.exists()) {
+          // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
+          await set(uraRef, feedback);
+          console.log("Feedback salvo no Firebase.");
+        } else {
+          console.log("Feedback já foi salvo para esta sessão.");
+        }
+        
       } catch (error) {
         console.error("Erro ao enviar transcrição para análise:", error);
       }
     }
-
+  
     // Limpar a transcrição acumulada
     setTranscription("");
   };
+  
 
   const processedSignals = useRef(new Set());
 
