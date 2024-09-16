@@ -18,6 +18,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   const recognition = useRef(null);
   const callSessionIdRef = useRef(null);
   const [transcription, setTranscription] = useState("");
+  const feedbackSent = useRef(false); // Adicione isto aqui
+  
 
   useEffect(() => {
     if (!socket.current) {
