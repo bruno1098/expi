@@ -1,60 +1,62 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
-import { ref, set, get, push, runTransaction, onValue } from "firebase/database";
-import { database } from "../pages/api/feedback"; 
+import { ref, set, get, push, runTransaction, onValue, getDatabase  } from "firebase/database";
+import { database, getNextUraId,   } from "../pages/api/feedback"; 
 import { Button } from "@/components/ui/button";
 import { v4 as uuidv4 } from 'uuid';
-import axios from 'axios'; // Import necessário para chamadas HTTP
+import axios from 'axios';
 
 const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
   const [isInCall, setIsInCall] = useState(false);
   const [currentChannel, setCurrentChannel] = useState(null);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const localStreamRef = useRef(null); // Novo ref para o fluxo de áudio local
   const peer = useRef(null);
   const socket = useRef(null);
   const recognition = useRef(null);
   const callSessionIdRef = useRef(null);
-  const [transcription, setTranscription] = useState(""); // Estado para acumular transcrições
+  const [transcription, setTranscription] = useState("");
 
-  // Inicializa o WebSocket apenas uma vez
   useEffect(() => {
     if (!socket.current) {
-      socket.current = new WebSocket('wss://serverexpi.onrender.com/ws');
-
+      socket.current = new WebSocket('wss://serverexpi.onrender.com');
+  
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
       };
-
+  
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
         console.log("Mensagem recebida no WebSocket:", data);
-
+  
         if (data.userId !== userId) {
           if (data.signalData) {
+            console.log('Recebido sinal do peer:', data.signalData);
             handleIncomingCall(data);
           }
         }
       };
-
+  
       socket.current.onerror = (error) => {
-        console.error('Erro no WebSocket:', error);
+        console.error('Erro no WebSocket no cliente:', error);
       };
-
+  
       socket.current.onclose = () => {
         console.log('WebSocket desconectado');
         socket.current = null;
       };
     }
-
+  
     return () => {
       if (socket.current) {
         socket.current.close();
         socket.current = null;
       }
     };
-  }, [userId]);
+  }, []); // Certifique-se de que o array de dependências está vazio
+  
 
   // Gerenciar desconexões abruptas
   useEffect(() => {
@@ -71,47 +73,55 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     };
   }, [isInCall]);
 
-  const createPeer = useCallback((initiator, signalData = null) => {
-    const peerInstance = new Peer({
-      initiator,
+  const createPeer = (isInitiator, incomingSignal = null) => {
+    peer.current = new Peer({
+      initiator: isInitiator,
       trickle: false,
-      stream: localAudioRef.current.srcObject,
+      stream: localStreamRef.current,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+        ],
+      },
     });
-
-    peerInstance.on('signal', (signal) => {
+  
+    peer.current.on('signal', (signal) => {
+      console.log('Emitting signal:', signal);
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         const payload = { signalData: signal, userId };
         socket.current.send(JSON.stringify(payload));
       }
     });
-
-    peerInstance.on('stream', (stream) => {
+  
+    peer.current.on('connect', () => {
+      console.log('Conexão P2P estabelecida');
+    });
+  
+    peer.current.on('stream', (stream) => {
+      console.log('Stream recebida do peer');
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
+        remoteAudioRef.current.play().catch((error) => {
+          console.error('Erro ao reproduzir o áudio remoto:', error);
+        });
       }
-      setIsInCall(true);
     });
-
-    peerInstance.on('error', (err) => {
-      console.error("Erro no peer:", err);
+  
+    peer.current.on('error', (err) => {
+      console.error('Erro no peer:', err);
     });
-
-    peerInstance.on('close', () => {
-      setIsInCall(false);
-    });
-
-    if (signalData) {
-      peerInstance.signal(signalData);
+  
+    if (incomingSignal) {
+      peer.current.signal(incomingSignal);
     }
-
-    peer.current = peerInstance;
-  }, [userId]);
-
+  }
+  
   const enterVoiceChannel = async (channelName) => {
     if (!userName) {
       setIsUserModalOpen(true);
       return;
     }
+  
 
     setCurrentChannel(channelName);
 
@@ -130,6 +140,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         callSessionId = currentData.callSessionId;
         return { ...currentData, userCount: (currentData.userCount || 0) + 1 };
       }
+
+      
     });
 
     callSessionIdRef.current = callSessionId;
@@ -146,9 +158,17 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     });
 
     // Obter o stream de áudio local
-    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    if (localAudioRef.current) {
-      localAudioRef.current.srcObject = localStream;
+    let localStream;
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (localAudioRef.current) {
+        localAudioRef.current.srcObject = localStream;
+      }
+      localStreamRef.current = localStream; // Armazenar o fluxo de áudio local
+    } catch (error) {
+      console.error('Erro ao acessar o microfone:', error);
+      alert('Não foi possível acessar o microfone. Verifique se você tem um microfone conectado e se o navegador tem permissão para acessá-lo.');
+      return;
     }
 
     // Iniciar reconhecimento de fala
@@ -171,12 +191,24 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
 
     setIsInCall(true);
+    if (userCount === 1) {
+      // Primeiro usuário no canal, será o iniciador
+      createPeer(true);
+    } else {
+      // Segundo usuário, não é o iniciador
+      createPeer(false);
+    }
   };
 
   const leaveVoiceChannel = async () => {
     if (peer.current) {
       peer.current.destroy();
       peer.current = null;
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
     }
 
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
@@ -233,38 +265,58 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
     // Limpar a transcrição acumulada
     setTranscription("");
-
-    // Atualizar a página (opcional, se desejar recarregar)
-    // window.location.reload();
   };
 
-  const handleIncomingCall = useCallback(async (data) => {
-    if (!peer.current) {
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const processedSignals = useRef(new Set());
+
+const handleIncomingCall = useCallback(async (data) => {
+  const signalId = JSON.stringify(data.signalData);
+  if (processedSignals.current.has(signalId)) {
+    console.log('Sinal já processado, ignorando.');
+    return;
+  }
+  processedSignals.current.add(signalId);
+
+  if (!peer.current) {
+    // Obter o stream de áudio local
+    let localStream;
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (localAudioRef.current) {
         localAudioRef.current.srcObject = localStream;
       }
-      createPeer(false, data.signalData);
-    } else {
-      peer.current.signal(data.signalData);
-    }
-  }, [createPeer]);
-
-  const getUserNameFromFirebase = async (userId) => {
-    try {
-      const userRef = ref(database, `users/${userId}`);
-      const snapshot = await get(userRef);
-
-      if (snapshot.exists()) {
-        return snapshot.val().name;
-      } else {
-        return "Outro Usuário";
-      }
+      localStreamRef.current = localStream; // Armazenar o fluxo de áudio local
     } catch (error) {
-      console.error("Erro ao buscar o nome do usuário:", error);
-      return "Outro Usuário";
+      console.error('Erro ao acessar o microfone:', error);
+      return;
     }
-  };
+    createPeer(false, data.signalData);
+  } else {
+    peer.current.signal(data.signalData);
+  }
+
+  // Dentro de handleIncomingCall
+console.log('Received signal data:', data.signalData);
+
+
+}, [createPeer]);
+
+
+  // const getUserNameFromFirebase = async (userId) => {
+  //   try {
+  //     const userRef = ref(database, `users/${userId}`);
+  //     const snapshot = await get(userRef);
+
+  //     if (snapshot.exists()) {
+  //       return snapshot.val().name;
+  //     } else {
+  //       return "Outro Usuário";
+  //     }
+  //   } catch (error) {
+  //     console.error("Erro ao buscar o nome do usuário:", error);
+  //     return "Outro Usuário";
+  //   }
+  // };
 
   // Funções para reconhecimento de fala
   const startSpeechRecognition = () => {
@@ -306,11 +358,16 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
   };
 
-  // Função para analisar a conversa com o GPT
+
+  // Função para analisar a conversa com o GPT e salvar no Firebase
   const analyzeConversationWithGPT = async (conversation) => {
     const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
-
+    
+    // Inicializa o Firebase Database
+    const database = getDatabase();
+  
     try {
+      // Primeiro, obter a análise da conversa
       const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -320,10 +377,10 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
             { role: "user", content: `
               Analise a seguinte conversa de atendimento ao cliente. Identifique quem é o cliente e quem é o atendente com base em palavras-chave.
               Analise o sentimento da conversa e determine se o cliente foi atendido de forma correta, se ficou satisfeito ou insatisfeito, e forneça feedback sobre como melhorar o atendimento.
-
+  
               Conversa:
               ${conversation}
-
+  
               Análise:
             ` },
           ],
@@ -337,15 +394,64 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           },
         }
       );
-
+  
       const analysis = response.data.choices[0].message.content.trim();
-      return analysis;
-
+  
+      // Agora, gerar a categorização (rating) com base na análise
+      const categorizationPrompt = `
+        Dado o seguinte feedback:
+  
+        "${analysis}"
+  
+        Categorize este feedback como uma única palavra entre: "Bom", "Ruim", "Neutro", "Insatisfeito". 
+        Apenas responda com uma dessas palavras e nada mais.
+      `;
+  
+      const categorizationResponse = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: "Você é um assistente que categoriza feedbacks." },
+            { role: "user", content: categorizationPrompt },
+          ],
+          max_tokens: 10,
+          temperature: 0.7,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+        }
+      );
+  
+      const categoryResult = categorizationResponse.data.choices[0].message.content.trim();
+  
+      // Preparar os dados do feedback
+      const feedbackData = {
+        id: await getNextUraId(), // Função para obter o próximo ID único
+        usuario: userName, // Substitua pelo nome real do usuário
+        comentario: analysis,
+        rating: categoryResult,
+        data: new Date().toISOString(),
+      };
+  
+      // Salvar o feedback no Firebase em /ura/{id}
+      const feedbackRef = ref(database, `ura/${feedbackData.id}`);
+      await set(feedbackRef, feedbackData);
+      console.log("Feedback salvo com sucesso no Firebase.");
+  
+      // Retornar a análise e o rating, se necessário
+      return { analysis, rating: categoryResult };
+  
     } catch (error) {
       console.error("Erro ao analisar a conversa com o GPT:", error);
       throw new Error("Erro ao analisar a conversa.");
     }
   };
+
+
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-background text-foreground">
@@ -377,6 +483,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />
+      <audio ref={remoteAudioRef} autoPlay />
+
     </div>
   );
 };

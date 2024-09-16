@@ -191,43 +191,6 @@ export function Chat() {
     }
   };
 
-  const saveConversation = async (newMessages: Message[]) => {
-    let updatedHistory: Conversation[] = history ? [...history] : [];
-
-    if (activeConversationIndex === null) {
-      // Criar uma nova conversa apenas uma vez
-      const title = await generateTitleFromGPT(newMessages);
-      setCurrentTitle(title);
-
-      // Obter o próximo ID único para a nova conversa
-      const newConversationId = await getNextConversationId();
-
-      const newConversation: Conversation = {
-        id: newConversationId,
-        title,
-        messages: newMessages,
-      };
-
-      updatedHistory = [...updatedHistory, newConversation];
-      setHistory(updatedHistory);
-      setActiveConversationIndex(updatedHistory.length - 1);
-
-      // Salvar a nova conversa no Firebase
-      await saveConversationToFirebase(newConversation.id, newConversation);
-    } else {
-      // Atualiza a conversa existente com as novas mensagens
-      const updatedConversation = updatedHistory[activeConversationIndex];
-      updatedConversation.messages = [...updatedConversation.messages, ...newMessages];
-
-      setHistory(updatedHistory);
-
-      const conversationData = {
-        title: updatedConversation.title,
-        messages: updatedConversation.messages,
-      };
-      await saveConversationToFirebase(updatedConversation.id, conversationData);
-    }
-  };
 
   const handleSubmit = async () => {
     const promptText = inputValue.trim();
@@ -347,7 +310,43 @@ export function Chat() {
   };
 
 
+  const saveConversation = async (newMessages: Message[]) => {
+    let updatedHistory: Conversation[] = history ? [...history] : [];
 
+    if (activeConversationIndex === null) {
+      // Criar uma nova conversa apenas uma vez
+      const title = await generateTitleFromGPT(newMessages);
+      setCurrentTitle(title);
+
+      // Obter o próximo ID único para a nova conversa
+      const newConversationId = await getNextConversationId();
+
+      const newConversation: Conversation = {
+        id: newConversationId,
+        title,
+        messages: newMessages,
+      };
+
+      updatedHistory = [...updatedHistory, newConversation];
+      setHistory(updatedHistory);
+      setActiveConversationIndex(updatedHistory.length - 1);
+
+      // Salvar a nova conversa no Firebase
+      await saveConversationToFirebase(newConversation.id, newConversation);
+    } else {
+      // Atualiza a conversa existente com as novas mensagens
+      const updatedConversation = updatedHistory[activeConversationIndex];
+      updatedConversation.messages = [...updatedConversation.messages, ...newMessages];
+
+      setHistory(updatedHistory);
+
+      const conversationData = {
+        title: updatedConversation.title,
+        messages: updatedConversation.messages,
+      };
+      await saveConversationToFirebase(updatedConversation.id, conversationData);
+    }
+  };
 
   const handleOpenFeedbackModal = async () => {
     if (messages.length === 0) {
@@ -715,3 +714,5 @@ function SendIcon(props: React.JSX.IntrinsicAttributes & React.SVGProps<SVGSVGEl
     </svg>
   );
 }
+
+
