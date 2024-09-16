@@ -248,27 +248,25 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   
     console.log("Saindo do canal de voz");
   
-    // Enviar a transcrição acumulada para a análise do GPT apenas uma vez
-    if (transcription.trim() !== "") {
+    // Verificar se o feedback já foi enviado
+    if (!feedbackSent.current && transcription.trim() !== "") {
       try {
         const feedback = await analyzeConversationWithGPT(transcription);
         console.log("Feedback gerado:", feedback);
   
-        // Verifique se o feedback já foi enviado
+        // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
         const uraRef = ref(database, `ura/${currentCallSessionId}/feedback`);
-        const feedbackSnapshot = await get(uraRef);
-        
-        if (!feedbackSnapshot.exists()) {
-          // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
-          await set(uraRef, feedback);
-          console.log("Feedback salvo no Firebase.");
-        } else {
-          console.log("Feedback já foi salvo para esta sessão.");
-        }
-        
+        await set(uraRef, feedback);
+        console.log("Feedback salvo no Firebase.");
+  
+        // Marcar como enviado
+        feedbackSent.current = true;
+  
       } catch (error) {
         console.error("Erro ao enviar transcrição para análise:", error);
       }
+    } else {
+      console.log("Feedback já foi enviado ou não há transcrição.");
     }
   
     // Limpar a transcrição acumulada
@@ -368,14 +366,15 @@ console.log('Received signal data:', data.signalData);
   };
 
 
-  // Função para analisar a conversa com o GPT e salvar no Firebase
-  const analyzeConversationWithGPT = async (conversation) => {
+   const analyzeConversationWithGPT = async (conversation) => {
     const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
-    
-    // Inicializa o Firebase Database
-    const database = getDatabase();
   
     try {
+      // Verificar se a conversa é válida
+      if (!conversation || conversation.trim() === "") {
+        throw new Error("Conversa vazia ou inválida.");
+      }
+  
       // Primeiro, obter a análise da conversa
       const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -405,6 +404,11 @@ console.log('Received signal data:', data.signalData);
       );
   
       const analysis = response.data.choices[0].message.content.trim();
+  
+      // Verificar se a análise é válida
+      if (!analysis) {
+        throw new Error("Falha ao gerar análise da conversa.");
+      }
   
       // Agora, gerar a categorização (rating) com base na análise
       const categorizationPrompt = `
@@ -437,6 +441,11 @@ console.log('Received signal data:', data.signalData);
   
       const categoryResult = categorizationResponse.data.choices[0].message.content.trim();
   
+      // Verificar se a categorização foi gerada
+      if (!categoryResult) {
+        throw new Error("Falha ao categorizar a conversa.");
+      }
+  
       // Preparar os dados do feedback
       const feedbackData = {
         id: await getNextUraId(), // Função para obter o próximo ID único
@@ -446,10 +455,17 @@ console.log('Received signal data:', data.signalData);
         data: new Date().toISOString(),
       };
   
-      // Salvar o feedback no Firebase em /ura/{id}
+      // Verificar se o feedback já existe no Firebase antes de salvar
       const feedbackRef = ref(database, `ura/${feedbackData.id}`);
-      await set(feedbackRef, feedbackData);
-      console.log("Feedback salvo com sucesso no Firebase.");
+      const feedbackSnapshot = await get(feedbackRef);
+  
+      if (!feedbackSnapshot.exists()) {
+        // Salvar o feedback no Firebase se ele não existir
+        await set(feedbackRef, feedbackData);
+        console.log("Feedback salvo com sucesso no Firebase.");
+      } else {
+        console.log("Feedback já existe no Firebase.");
+      }
   
       // Retornar a análise e o rating, se necessário
       return { analysis, rating: categoryResult };
@@ -459,6 +475,7 @@ console.log('Received signal data:', data.signalData);
       throw new Error("Erro ao analisar a conversa.");
     }
   };
+  
 
 
 
