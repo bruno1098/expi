@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
-import { ref, set, get, push, runTransaction, onValue, getDatabase  } from "firebase/database";
-import { database, getNextUraId,   } from "../pages/api/feedback"; 
+import { ref, set, get, push, runTransaction, onValue, getDatabase } from "firebase/database";
+import { database, getNextUraId } from "../pages/api/feedback"; 
 import { Button } from "@/components/ui/button";
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
@@ -19,7 +19,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   const callSessionIdRef = useRef(null);
   const [transcription, setTranscription] = useState("");
   const feedbackSent = useRef(false); // Adicione isto aqui
-  
+  const isLeaving = useRef(false); // Novo ref para evitar múltiplas chamadas de leaveVoiceChannel
 
   useEffect(() => {
     if (!socket.current) {
@@ -58,12 +58,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       }
     };
   }, []); // Certifique-se de que o array de dependências está vazio
-  
 
   // Gerenciar desconexões abruptas
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isInCall) {
+      if (isInCall && !isLeaving.current) {
         leaveVoiceChannel();
       }
     };
@@ -76,6 +75,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   }, [isInCall]);
 
   const createPeer = (isInitiator, incomingSignal = null) => {
+    console.log("Criando Peer. Iniciador:", isInitiator);
     peer.current = new Peer({
       initiator: isInitiator,
       trickle: false,
@@ -117,21 +117,20 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       peer.current.signal(incomingSignal);
     }
   }
-  
+
   const enterVoiceChannel = async (channelName) => {
     if (!userName) {
       setIsUserModalOpen(true);
       return;
     }
   
-
     setCurrentChannel(channelName);
-
+  
     // Referência para o canal no Firebase
     const channelRef = ref(database, `channels/${channelName}`);
-
+  
     let callSessionId;
-
+  
     await runTransaction(channelRef, (currentData) => {
       if (currentData === null) {
         // Nenhum callSessionId existe, criar um novo
@@ -142,23 +141,21 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         callSessionId = currentData.callSessionId;
         return { ...currentData, userCount: (currentData.userCount || 0) + 1 };
       }
-
-      
     });
-
+  
     callSessionIdRef.current = callSessionId;
-
+  
     // Adicionar o usuário à lista de usuários no Firebase
     const usersRef = ref(database, `channels/${channelName}/users/${userId}`);
     await set(usersRef, userName);
-
+  
     // Ouvir mudanças na lista de usuários
     const usersListRef = ref(database, `channels/${channelName}/users`);
     onValue(usersListRef, (snapshot) => {
       const users = snapshot.val() ? Object.values(snapshot.val()) : [];
       setUsersInCall(users);
     });
-
+  
     // Obter o stream de áudio local
     let localStream;
     try {
@@ -172,34 +169,27 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       alert('Não foi possível acessar o microfone. Verifique se você tem um microfone conectado e se o navegador tem permissão para acessá-lo.');
       return;
     }
-
+  
     // Iniciar reconhecimento de fala
     startSpeechRecognition();
-
+  
     // Obter o número de usuários no canal
     const channelSnapshot = await get(channelRef);
     const userCount = channelSnapshot.exists() ? channelSnapshot.val().userCount : 1;
-
+  
     // Definir se você é o iniciador
     if (userCount === 1) {
       createPeer(true);
     } else {
       createPeer(false);
     }
-
+  
     // Notifica os outros usuários que você entrou no canal
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
       socket.current.send(JSON.stringify({ userId, joined: true }));
     }
-
+  
     setIsInCall(true);
-    if (userCount === 1) {
-      // Primeiro usuário no canal, será o iniciador
-      createPeer(true);
-    } else {
-      // Segundo usuário, não é o iniciador
-      createPeer(false);
-    }
   };
 
   const leaveVoiceChannel = async () => {
@@ -207,125 +197,117 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       console.log("Nenhuma sessão ativa para sair.");
       return;
     }
-  
-    if (peer.current) {
-      peer.current.destroy();
-      peer.current = null;
+
+    if (isLeaving.current) {
+      console.log("Já está processando a saída do canal.");
+      return;
     }
+
+    isLeaving.current = true; // Marcar como em processo de saída
+
+    try {
+      if (peer.current) {
+        peer.current.destroy();
+        peer.current = null;
+      }
   
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
-    }
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current = null;
+      }
   
-    if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-      socket.current.send(JSON.stringify({ userId, left: true }));
-    }
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+        socket.current.send(JSON.stringify({ userId, left: true }));
+      }
   
-    // Parar reconhecimento de fala
-    stopSpeechRecognition();
+      // Parar reconhecimento de fala
+      stopSpeechRecognition();
   
-    setIsInCall(false);
+      setIsInCall(false);
   
-    // Remover o usuário da lista de usuários no Firebase
-    const usersRef = ref(database, `channels/${currentChannel}/users/${userId}`);
-    await set(usersRef, null);
+      // Remover o usuário da lista de usuários no Firebase
+      const usersRef = ref(database, `channels/${currentChannel}/users/${userId}`);
+      await set(usersRef, null);
   
-    // Decrementar userCount no Firebase
-    const channelRef = ref(database, `channels/${currentChannel}`);
-    await runTransaction(channelRef, (currentData) => {
-      if (currentData !== null) {
-        const newUserCount = (currentData.userCount || 1) - 1;
-        if (newUserCount <= 0) {
-          return null; // Remover canal se não houver usuários
-        } else {
-          return { ...currentData, userCount: newUserCount };
+      // Decrementar userCount no Firebase
+      const channelRef = ref(database, `channels/${currentChannel}`);
+      await runTransaction(channelRef, (currentData) => {
+        if (currentData !== null) {
+          const newUserCount = (currentData.userCount || 1) - 1;
+          if (newUserCount <= 0) {
+            return null; // Remover canal se não houver usuários
+          } else {
+            return { ...currentData, userCount: newUserCount };
+          }
         }
+        return currentData;
+      });
+  
+      const currentCallSessionId = callSessionIdRef.current; // Armazena o ID atual antes de limpar
+      callSessionIdRef.current = null; // Limpar o ID da sessão
+  
+      console.log("Saindo do canal de voz");
+  
+      // Verificar se o feedback já foi enviado
+      if (!feedbackSent.current && transcription.trim() !== "") {
+        try {
+          const feedback = await analyzeConversationWithGPT(transcription);
+          console.log("Feedback gerado:", feedback);
+  
+          // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
+          const uraRef = ref(database, `ura/${currentCallSessionId}/feedback`);
+          await set(uraRef, feedback);
+          console.log("Feedback salvo no Firebase.");
+  
+          // Marcar como enviado
+          feedbackSent.current = true;
+  
+        } catch (error) {
+          console.error("Erro ao enviar transcrição para análise:", error);
+        }
+      } else {
+        console.log("Feedback já foi enviado ou não há transcrição.");
       }
-      return currentData;
-    });
   
-    const currentCallSessionId = callSessionIdRef.current; // Armazena o ID atual antes de limpar
-    callSessionIdRef.current = null; // Limpar o ID da sessão
-  
-    console.log("Saindo do canal de voz");
-  
-    // Verificar se o feedback já foi enviado
-    if (!feedbackSent.current && transcription.trim() !== "") {
-      try {
-        const feedback = await analyzeConversationWithGPT(transcription);
-        console.log("Feedback gerado:", feedback);
-  
-        // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
-        const uraRef = ref(database, `ura/${currentCallSessionId}/feedback`);
-        await set(uraRef, feedback);
-        console.log("Feedback salvo no Firebase.");
-  
-        // Marcar como enviado
-        feedbackSent.current = true;
-  
-      } catch (error) {
-        console.error("Erro ao enviar transcrição para análise:", error);
-      }
-    } else {
-      console.log("Feedback já foi enviado ou não há transcrição.");
+      // Limpar a transcrição acumulada
+      setTranscription("");
+    } finally {
+      isLeaving.current = false; // Resetar o estado de saída
     }
-  
-    // Limpar a transcrição acumulada
-    setTranscription("");
   };
-  
 
   const processedSignals = useRef(new Set());
 
-const handleIncomingCall = useCallback(async (data) => {
-  const signalId = JSON.stringify(data.signalData);
-  if (processedSignals.current.has(signalId)) {
-    console.log('Sinal já processado, ignorando.');
-    return;
-  }
-  processedSignals.current.add(signalId);
-
-  if (!peer.current) {
-    // Obter o stream de áudio local
-    let localStream;
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (localAudioRef.current) {
-        localAudioRef.current.srcObject = localStream;
-      }
-      localStreamRef.current = localStream; // Armazenar o fluxo de áudio local
-    } catch (error) {
-      console.error('Erro ao acessar o microfone:', error);
+  const handleIncomingCall = useCallback(async (data) => {
+    const signalId = JSON.stringify(data.signalData);
+    if (processedSignals.current.has(signalId)) {
+      console.log('Sinal já processado, ignorando.');
       return;
     }
-    createPeer(false, data.signalData);
-  } else {
-    peer.current.signal(data.signalData);
-  }
-
-  // Dentro de handleIncomingCall
-console.log('Received signal data:', data.signalData);
-
-
-}, [createPeer]);
-
-
-  // const getUserNameFromFirebase = async (userId) => {
-  //   try {
-  //     const userRef = ref(database, `users/${userId}`);
-  //     const snapshot = await get(userRef);
-
-  //     if (snapshot.exists()) {
-  //       return snapshot.val().name;
-  //     } else {
-  //       return "Outro Usuário";
-  //     }
-  //   } catch (error) {
-  //     console.error("Erro ao buscar o nome do usuário:", error);
-  //     return "Outro Usuário";
-  //   }
-  // };
+    processedSignals.current.add(signalId);
+  
+    if (!peer.current) {
+      // Obter o stream de áudio local
+      let localStream;
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (localAudioRef.current) {
+          localAudioRef.current.srcObject = localStream;
+        }
+        localStreamRef.current = localStream; // Armazenar o fluxo de áudio local
+      } catch (error) {
+        console.error('Erro ao acessar o microfone:', error);
+        return;
+      }
+      createPeer(false, data.signalData);
+    } else {
+      peer.current.signal(data.signalData);
+    }
+  
+    // Dentro de handleIncomingCall
+    console.log('Received signal data:', data.signalData);
+  
+  }, [createPeer]);
 
   // Funções para reconhecimento de fala
   const startSpeechRecognition = () => {
@@ -367,8 +349,7 @@ console.log('Received signal data:', data.signalData);
     }
   };
 
-
-   const analyzeConversationWithGPT = async (conversation) => {
+  const analyzeConversationWithGPT = async (conversation) => {
     const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
   
     try {
@@ -477,7 +458,6 @@ console.log('Received signal data:', data.signalData);
       throw new Error("Erro ao analisar a conversa.");
     }
   };
-  
 
 
 
@@ -511,7 +491,7 @@ console.log('Received signal data:', data.signalData);
 
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />
-      <audio ref={remoteAudioRef} autoPlay />
+  
 
     </div>
   );
