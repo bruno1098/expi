@@ -359,12 +359,10 @@ console.log('Received signal data:', data.signalData);
   };
 
 
-
-
 // Função para analisar a conversa com o GPT e salvar no Firebase
-const analyzeConversationWithGPT = async (conversation, userName) => {
+const analyzeConversationWithGPT = async (conversation, userName) => { // Adicione 'userName' como parâmetro
   const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
-
+  
   // Inicializa o Firebase Database
   const database = getDatabase();
 
@@ -432,22 +430,19 @@ const analyzeConversationWithGPT = async (conversation, userName) => {
 
     // Preparar os dados do feedback
     const feedbackData = {
-      usuario: userName, // Substitua pelo nome real do usuário
+      usuario: userName, // Nome real do usuário passado como parâmetro
       comentario: analysis,
       rating: categoryResult,
       data: new Date().toISOString(),
     };
 
-    // Salvar o feedback no Firebase em /ura usando push para gerar um ID único
-    const feedbackRef = ref(database, 'ura');
-    const newFeedbackRef = push(feedbackRef);
+    // Salvar o feedback no Firebase usando 'push' para gerar um ID único
+    const feedbackListRef = ref(database, `ura/`);
+    const newFeedbackRef = push(feedbackListRef);
     await set(newFeedbackRef, feedbackData);
+    console.log("Feedback salvo com sucesso no Firebase.");
 
-    // Log formatado do feedback salvo
-    console.log("Feedback salvo com sucesso no Firebase:");
-    console.log(JSON.stringify(feedbackData, null, 2));
-
-    // Se precisar retornar os dados
+    // Retornar a análise e o rating, se necessário
     return { analysis, rating: categoryResult };
 
   } catch (error) {
@@ -455,8 +450,6 @@ const analyzeConversationWithGPT = async (conversation, userName) => {
     throw new Error("Erro ao analisar a conversa.");
   }
 };
-
-
 
 
 
