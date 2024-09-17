@@ -508,20 +508,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       </div>
 
       {/* Exibição das mensagens da conversa */}
-      {isInCall && (
-        <div className="w-full max-w-md bg-background rounded-md p-4 mt-4 overflow-y-auto h-64">
-          <h3 className="text-lg font-semibold mb-2">Conversa</h3>
-          <div className="space-y-2">
-            {messages.map((message, index) => (
-              <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                  <p>{message.content}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+     
 
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />
