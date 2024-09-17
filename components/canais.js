@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 
-const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen }) => {
-  const [isInCall, setIsInCall] = useState(false);
+const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen, addVoiceMessage }) => {
+const [isInCall, setIsInCall] = useState(false);
   const [currentChannel, setCurrentChannel] = useState(null);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -21,43 +21,51 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   const feedbackSent = useRef(false); // Adicione isto aqui
   const isLeaving = useRef(false); // Novo ref para evitar múltiplas chamadas de leaveVoiceChannel
 
+  // Estado para gerenciar mensagens da conversa
+  const [messages, setMessages] = useState([]);
+
   useEffect(() => {
     if (!socket.current) {
       socket.current = new WebSocket('wss://serverexpi.onrender.com');
-  
+
       socket.current.onopen = () => {
         console.log('Conexão WebSocket estabelecida');
       };
-  
+
       socket.current.onmessage = async (message) => {
         const data = JSON.parse(message.data);
         console.log("Mensagem recebida no WebSocket:", data);
-  
+
         if (data.userId !== userId) {
           if (data.signalData) {
             console.log('Recebido sinal do peer:', data.signalData);
             handleIncomingCall(data);
           }
+
+          // Verificar se a mensagem é uma transcrição
+          if (data.type === 'transcription' && data.text) {
+            addMessage({ sender: 'peer', content: data.text });
+          }
         }
       };
-  
+
       socket.current.onerror = (error) => {
         console.error('Erro no WebSocket no cliente:', error);
       };
-  
+
       socket.current.onclose = () => {
         console.log('WebSocket desconectado');
         socket.current = null;
       };
     }
-  
+
     return () => {
       if (socket.current) {
         socket.current.close();
         socket.current = null;
       }
     };
-  }, []); // Certifique-se de que o array de dependências está vazio
+  }, [userId]); // Adicione userId como dependência
 
   // Gerenciar desconexões abruptas
   useEffect(() => {
@@ -86,7 +94,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         ],
       },
     });
-  
+
     peer.current.on('signal', (signal) => {
       console.log('Emitting signal:', signal);
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
@@ -94,11 +102,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         socket.current.send(JSON.stringify(payload));
       }
     });
-  
+
     peer.current.on('connect', () => {
       console.log('Conexão P2P estabelecida');
     });
-  
+
     peer.current.on('stream', (stream) => {
       console.log('Stream recebida do peer');
       if (remoteAudioRef.current) {
@@ -108,11 +116,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         });
       }
     });
-  
+
     peer.current.on('error', (err) => {
       console.error('Erro no peer:', err);
     });
-  
+
     if (incomingSignal) {
       peer.current.signal(incomingSignal);
     }
@@ -123,14 +131,14 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       setIsUserModalOpen(true);
       return;
     }
-  
+
     setCurrentChannel(channelName);
-  
+
     // Referência para o canal no Firebase
     const channelRef = ref(database, `channels/${channelName}`);
-  
+
     let callSessionId;
-  
+
     await runTransaction(channelRef, (currentData) => {
       if (currentData === null) {
         // Nenhum callSessionId existe, criar um novo
@@ -142,20 +150,20 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         return { ...currentData, userCount: (currentData.userCount || 0) + 1 };
       }
     });
-  
+
     callSessionIdRef.current = callSessionId;
-  
+
     // Adicionar o usuário à lista de usuários no Firebase
     const usersRef = ref(database, `channels/${channelName}/users/${userId}`);
     await set(usersRef, userName);
-  
+
     // Ouvir mudanças na lista de usuários
     const usersListRef = ref(database, `channels/${channelName}/users`);
     onValue(usersListRef, (snapshot) => {
       const users = snapshot.val() ? Object.values(snapshot.val()) : [];
       setUsersInCall(users);
     });
-  
+
     // Obter o stream de áudio local
     let localStream;
     try {
@@ -169,26 +177,26 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       alert('Não foi possível acessar o microfone. Verifique se você tem um microfone conectado e se o navegador tem permissão para acessá-lo.');
       return;
     }
-  
+
     // Iniciar reconhecimento de fala
     startSpeechRecognition();
-  
+
     // Obter o número de usuários no canal
     const channelSnapshot = await get(channelRef);
     const userCount = channelSnapshot.exists() ? channelSnapshot.val().userCount : 1;
-  
+
     // Definir se você é o iniciador
     if (userCount === 1) {
       createPeer(true);
     } else {
       createPeer(false);
     }
-  
+
     // Notifica os outros usuários que você entrou no canal
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
       socket.current.send(JSON.stringify({ userId, joined: true }));
     }
-  
+
     setIsInCall(true);
   };
 
@@ -210,25 +218,25 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         peer.current.destroy();
         peer.current = null;
       }
-  
+
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
         localStreamRef.current = null;
       }
-  
+
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
         socket.current.send(JSON.stringify({ userId, left: true }));
       }
-  
+
       // Parar reconhecimento de fala
       stopSpeechRecognition();
-  
+
       setIsInCall(false);
-  
+
       // Remover o usuário da lista de usuários no Firebase
       const usersRef = ref(database, `channels/${currentChannel}/users/${userId}`);
       await set(usersRef, null);
-  
+
       // Decrementar userCount no Firebase
       const channelRef = ref(database, `channels/${currentChannel}`);
       await runTransaction(channelRef, (currentData) => {
@@ -242,33 +250,33 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         }
         return currentData;
       });
-  
+
       const currentCallSessionId = callSessionIdRef.current; // Armazena o ID atual antes de limpar
       callSessionIdRef.current = null; // Limpar o ID da sessão
-  
+
       console.log("Saindo do canal de voz");
-  
+
       // Verificar se o feedback já foi enviado
       if (!feedbackSent.current && transcription.trim() !== "") {
         try {
           const feedback = await analyzeConversationWithGPT(transcription);
           console.log("Feedback gerado:", feedback);
-  
+
           // Salvar o feedback no Firebase em /ura/{callSessionId}/feedback
           const uraRef = ref(database, `ura/${currentCallSessionId}/feedback`);
           await set(uraRef, feedback);
           console.log("Feedback salvo no Firebase.");
-  
+
           // Marcar como enviado
           feedbackSent.current = true;
-  
+
         } catch (error) {
           console.error("Erro ao enviar transcrição para análise:", error);
         }
       } else {
         console.log("Feedback já foi enviado ou não há transcrição.");
       }
-  
+
       // Limpar a transcrição acumulada
       setTranscription("");
     } finally {
@@ -285,7 +293,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       return;
     }
     processedSignals.current.add(signalId);
-  
+
     if (!peer.current) {
       // Obter o stream de áudio local
       let localStream;
@@ -303,10 +311,10 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     } else {
       peer.current.signal(data.signalData);
     }
-  
+
     // Dentro de handleIncomingCall
     console.log('Received signal data:', data.signalData);
-  
+
   }, [createPeer]);
 
   // Funções para reconhecimento de fala
@@ -331,6 +339,13 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
       if (transcript) {
         setTranscription((prev) => prev + " " + transcript);
+        addMessage({ sender: 'self', content: transcript });
+
+        // Enviar a transcrição para o outro usuário via WebSocket
+        if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+          const payload = { type: 'transcription', text: transcript, userId };
+          socket.current.send(JSON.stringify(payload));
+        }
       }
     };
 
@@ -347,6 +362,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       recognition.current.stop();
       console.log("Reconhecimento de fala parado.");
     }
+  };
+
+  // Função para adicionar mensagens à lista
+  const addMessage = (message) => {
+    setMessages((prevMessages) => [...prevMessages, message]);
   };
 
   const analyzeConversationWithGPT = async (conversation) => {
@@ -459,8 +479,6 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     }
   };
 
-
-
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-background text-foreground">
       <h2 className="text-xl font-bold mb-4">Canais de Voz</h2>
@@ -489,10 +507,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         </ul>
       </div>
 
+      {/* Exibição das mensagens da conversa */}
+     
+
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />
-  
-
     </div>
   );
 };
