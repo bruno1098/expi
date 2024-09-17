@@ -23,10 +23,13 @@ type Message = {
   content: string;
 };
 
-type VoiceMessage = {
-  sender: "self" | "peer";
+// Definição do tipo VoiceMessage em chat.tsx
+interface VoiceMessage {
+  senderId: string;
+  senderName: string;
   content: string;
-};
+}
+
 
 type Conversation = {
   id: number; // Adiciona a propriedade 'id'
@@ -51,6 +54,7 @@ export function Chat() {
   const [errorMessage, setErrorMessage] = useState("");
   const [modalLoading, setModalLoading] = useState(false);
   const [usersInCall, setUsersInCall] = useState([]);
+  const [inputUserName, setInputUserName] = useState('');
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userName, setUserName] = useState("");
@@ -110,32 +114,38 @@ export function Chat() {
     setUserId(savedUserId);
   }, []);
 
-
+  useEffect(() => {
+    console.log('userName in Canais:', userName);
+  }, [userName]);
+  
 
   const handleSaveUserName = async () => {
-    if (userName.trim() === "") {
+    if (inputUserName.trim() === "") {
       alert("Por favor, insira um nome válido.");
       return;
     }
-
+  
     try {
       // Obter o próximo ID único para o usuário
       const newUserId = await getNextUserId();
-
+  
       // Salvar o usuário no Firebase
-      await saveUserToFirebase(newUserId, userName);
-
+      await saveUserToFirebase(newUserId, inputUserName);
+  
       // Salvar o nome e ID do usuário no sessionStorage
-      sessionStorage.setItem("userName", userName);
+      sessionStorage.setItem("userName", inputUserName);
       sessionStorage.setItem("userId", newUserId);
-
+  
+      // Atualizar o estado do userName com o valor do input
+      setUserName(inputUserName);
       setUserId(newUserId);
       setIsUserModalOpen(false); // Fecha o modal
     } catch (error) {
       console.error("Erro ao salvar o usuário:", error);
     }
   };
-
+  
+  
 
 
   useEffect(() => {
@@ -472,9 +482,13 @@ export function Chat() {
 
 
   // Função para adicionar mensagens de voz
+
   const addVoiceMessage = (message: VoiceMessage) => {
-    setVoiceMessages(prev => [...prev, message]);
+    setVoiceMessages((prevMessages) => [...prevMessages, message]);
   };
+  
+  
+  
 
   return (
     <div className="flex flex-col h-screen">
@@ -511,11 +525,12 @@ export function Chat() {
           title="Insira seu nome"
           isLoading={modalLoading}  // Definindo o isLoading como false, ou como o estado de carregamento que você preferir
         >
-          <Input
-            placeholder="Seu nome"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-          />
+         <Input
+  placeholder="Seu nome"
+  value={inputUserName}
+  onChange={(e) => setInputUserName(e.target.value)}
+/>
+
           <Button onClick={handleSaveUserName}>Salvar</Button>
         </Modal>
       )}
@@ -541,22 +556,6 @@ export function Chat() {
                 setIsUserModalOpen={setIsUserModalOpen} // Passando o controle do modal
                 addVoiceMessage={addVoiceMessage} // Passando a função para adicionar mensagens de voz
               />
-{usersInCall.length > 0 && (
-    <div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
-      <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
-      <div className="space-y-2">
-        {voiceMessages.map((message, index) => (
-          <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-              <p>{message.content}</p>
-            </div>
-          </div>
-        ))}
-        {/* Elemento para scroll automático */}
-        <div ref={messageEndRef} />
-      </div>
-    </div>
-    )}
               
             </TabsContent >
             <TabsContent value="modoescu" className="p-4 overflow-auto flex-1">
@@ -625,44 +624,56 @@ export function Chat() {
                         {user === 'self' ? userName : user}
                       </span>
                     </div>
-
-                    
                   ))}
                 </div>
               ) : (
                 <p className="text-muted-foreground">Nenhum usuário conectado ainda</p>
               )}
 
-              {/* Exibição das mensagens da conversa */}
-              <div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
-                <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
-                <div className="space-y-2">
-
-                <div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
-      <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
-      <div className="space-y-2">
-        {voiceMessages.map((message, index) => (
-          <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-              <p>{message.content}</p>
-            </div>
+           {/* Exibição das mensagens da conversa */}
+<div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
+  <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
+  <div className="space-y-4">
+    {voiceMessages.map((message, index) => (
+      <div
+        key={index}
+        className={`flex items-start ${
+          message.senderId === userId ? 'justify-end' : 'justify-start'
+        }`}
+      >
+        {message.senderId !== userId && (
+          <div className="flex items-center mr-2">
+            <Avatar className="w-8 h-8">
+              <AvatarImage src="/user.png" alt={message.senderName} />
+              <AvatarFallback>{message.senderName.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <span className="ml-2 text-sm">{message.senderName}</span>
           </div>
-        ))}
-        {/* Elemento para scroll automático */}
-        <div ref={messageEndRef} />
+        )}
+        <div
+          className={`p-2 rounded-md max-w-xs ${
+            message.senderId === userId
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-foreground'
+          }`}
+        >
+          <p>{message.content}</p>
+        </div>
+        {message.senderId === userId && (
+          <div className="flex items-center ml-2">
+            <span className="mr-2 text-sm">{userName}</span>
+            <Avatar className="w-8 h-8">
+              <AvatarImage src="/user.png" alt={userName} />
+              <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+            </Avatar>
+          </div>
+        )}
       </div>
-    </div>
-                  {voiceMessages.map((message, index) => (
-                    <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                        <p>{message.content}</p>
-                      </div>
-                    </div>
+    ))}
+  </div>
+</div>
 
-                    
-                  ))}
-                </div>
-              </div>
+
             </div>
 
           ) : (

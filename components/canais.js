@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FaUser } from "react-icons/fa";
 import Peer from 'simple-peer';
 import { ref, set, get, push, runTransaction, onValue, getDatabase } from "firebase/database";
-import { database, getNextUraId } from "../pages/api/feedback"; 
+import { database, getNextUraId } from "../pages/api/feedback";
 import { Button } from "@/components/ui/button";
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
@@ -23,6 +23,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
   // Estado para gerenciar mensagens da conversa
   const [messages, setMessages] = useState([]);
+
 
   useEffect(() => {
     if (!socket.current) {
@@ -45,6 +46,9 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           // Verificar se a mensagem é uma transcrição
           if (data.type === 'transcription' && data.text) {
             addMessage({ sender: 'peer', content: data.text });
+            addVoiceMessage({ senderId: data.userId,
+              senderName: data.userName || 'Usuário', // Define um valor padrão se userName estiver undefined
+              content: data.text,});
           }
         }
       };
@@ -98,9 +102,15 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
     peer.current.on('signal', (signal) => {
       console.log('Emitting signal:', signal);
       if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        const payload = { signalData: signal, userId };
+        const payload = {
+          type: 'transcription',
+          text: transcript,
+          userId,
+          userName, // Incluindo o nome do usuário
+        };
         socket.current.send(JSON.stringify(payload));
       }
+      
     });
 
     peer.current.on('connect', () => {
@@ -340,12 +350,24 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       if (transcript) {
         setTranscription((prev) => prev + " " + transcript);
         addMessage({ sender: 'self', content: transcript });
+        addVoiceMessage({
+          senderId: userId,
+          senderName: userName, // Certifique-se de que userName não está undefined
+          content: transcript,
+        });
+        
 
         // Enviar a transcrição para o outro usuário via WebSocket
         if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-          const payload = { type: 'transcription', text: transcript, userId };
+          const payload = {
+            type: 'transcription',
+            text: transcript,
+            userId,
+            userName, // Adicionado
+          };
           socket.current.send(JSON.stringify(payload));
         }
+
       }
     };
 
@@ -371,13 +393,13 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
 
   const analyzeConversationWithGPT = async (conversation) => {
     const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
-  
+
     try {
       // Verificar se a conversa é válida
       if (!conversation || conversation.trim() === "") {
         throw new Error("Conversa vazia ou inválida.");
       }
-  
+
       // Primeiro, obter a análise da conversa
       const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -385,7 +407,8 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           model: "gpt-3.5-turbo",
           messages: [
             { role: "system", content: "Você é um assistente que analisa conversas de atendimento ao cliente." },
-            { role: "user", content: `
+            {
+              role: "user", content: `
               Analise a seguinte conversa de atendimento ao cliente. Identifique quem é o cliente e quem é o atendente com base em palavras-chave.
               Analise o sentimento da conversa e determine se o cliente foi atendido de forma correta, se ficou satisfeito ou insatisfeito, e forneça feedback sobre como melhorar o atendimento.
   
@@ -405,14 +428,14 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           },
         }
       );
-  
+
       const analysis = response.data.choices[0].message.content.trim();
-  
+
       // Verificar se a análise é válida
       if (!analysis) {
         throw new Error("Falha ao gerar análise da conversa.");
       }
-  
+
       // Agora, gerar a categorização (rating) com base na análise
       const categorizationPrompt = `
         Dado o seguinte feedback:
@@ -422,7 +445,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         Categorize este feedback como uma única palavra entre: "Bom", "Ruim", "Neutro", "Insatisfeito". 
         Apenas responda com uma dessas palavras e nada mais.
       `;
-  
+
       const categorizationResponse = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -441,14 +464,14 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
           },
         }
       );
-  
+
       const categoryResult = categorizationResponse.data.choices[0].message.content.trim();
-  
+
       // Verificar se a categorização foi gerada
       if (!categoryResult) {
         throw new Error("Falha ao categorizar a conversa.");
       }
-  
+
       // Preparar os dados do feedback
       const feedbackData = {
         id: await getNextUraId(), // Função para obter o próximo ID único
@@ -457,11 +480,11 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         rating: categoryResult,
         data: new Date().toISOString(),
       };
-  
+
       // Verificar se o feedback já existe no Firebase antes de salvar
       const feedbackRef = ref(database, `ura/${feedbackData.id}`);
       const feedbackSnapshot = await get(feedbackRef);
-  
+
       if (!feedbackSnapshot.exists()) {
         // Salvar o feedback no Firebase se ele não existir
         await set(feedbackRef, feedbackData);
@@ -469,10 +492,10 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       } else {
         console.log("Feedback já existe no Firebase.");
       }
-  
+
       // Retornar a análise e o rating, se necessário
       return { analysis, rating: categoryResult };
-  
+
     } catch (error) {
       console.error("Erro ao analisar a conversa com o GPT:", error);
       throw new Error("Erro ao analisar a conversa.");
@@ -508,7 +531,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       </div>
 
       {/* Exibição das mensagens da conversa */}
-     
+
 
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />
