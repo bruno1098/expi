@@ -8,18 +8,18 @@ import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 
 const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, setIsUserModalOpen, addVoiceMessage }) => {
-const [isInCall, setIsInCall] = useState(false);
+  const [isInCall, setIsInCall] = useState(false);
   const [currentChannel, setCurrentChannel] = useState(null);
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
-  const localStreamRef = useRef(null); // Novo ref para o fluxo de áudio local
+  const localStreamRef = useRef(null); // Ref para o fluxo de áudio local
   const peer = useRef(null);
   const socket = useRef(null);
   const recognition = useRef(null);
   const callSessionIdRef = useRef(null);
   const [transcription, setTranscription] = useState("");
-  const feedbackSent = useRef(false); // Adicione isto aqui
-  const isLeaving = useRef(false); // Novo ref para evitar múltiplas chamadas de leaveVoiceChannel
+  const feedbackSent = useRef(false); // Evita envio duplicado de feedback
+  const isLeaving = useRef(false); // Evita múltiplas chamadas de saída
 
   // Estado para gerenciar mensagens da conversa
   const [messages, setMessages] = useState([]);
@@ -65,7 +65,7 @@ const [isInCall, setIsInCall] = useState(false);
         socket.current = null;
       }
     };
-  }, [userId]); // Adicione userId como dependência
+  }, [userId]); // Adiciona userId como dependência
 
   // Gerenciar desconexões abruptas
   useEffect(() => {
@@ -508,7 +508,20 @@ const [isInCall, setIsInCall] = useState(false);
       </div>
 
       {/* Exibição das mensagens da conversa */}
-     
+      {isInCall && (
+        <div className="w-full max-w-md bg-background rounded-md p-4 mt-4 overflow-y-auto h-64">
+          <h3 className="text-lg font-semibold mb-2">Conversa</h3>
+          <div className="space-y-2">
+            {messages.map((message, index) => (
+              <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                  <p>{message.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <audio ref={localAudioRef} autoPlay muted />
       <audio ref={remoteAudioRef} autoPlay />

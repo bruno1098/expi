@@ -11,10 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { saveConversationToFirebase, deleteConversationFromFirebase, getNextConversationId, getNextFeedbackId, getNextUserId, saveUserToFirebase } from "../pages/api/feedback"; // Importa as funções do arquivo feedback.js
 
+
 import axios from "axios";
 import { SettingsIcon, MoreHorizontalIcon } from "lucide-react";
 import Canais from "./canais";
 import { ref, set } from "firebase/database";
+
 
 type Message = {
   role: "user" | "ai";
@@ -34,7 +36,7 @@ type Conversation = {
 
 export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>([]); // Estado para mensagens de voz
+  const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>([]); // Novo estado para mensagens de voz
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<Conversation[]>([]);
@@ -55,7 +57,6 @@ export function Chat() {
   const [userId, setUserId] = useState("");
 
   const [isDarkMode, setIsDarkMode] = useState(false);
-  
   // Carregar o nome e o tema salvos no localStorage na inicialização
   useEffect(() => {
     // Verifica se há uma preferência de tema salva no localStorage
@@ -91,6 +92,7 @@ export function Chat() {
     setIsDarkMode(!isDarkMode);
   };
 
+
   const client = axios.create({
     baseURL: "https://api.openai.com/v1",
     headers: {
@@ -107,6 +109,8 @@ export function Chat() {
     setUserName(savedUserName);
     setUserId(savedUserId);
   }, []);
+
+
 
   const handleSaveUserName = async () => {
     if (userName.trim() === "") {
@@ -132,6 +136,8 @@ export function Chat() {
     }
   };
 
+
+
   useEffect(() => {
     const savedHistory = localStorage.getItem("chatHistory");
     if (savedHistory) {
@@ -153,7 +159,7 @@ export function Chat() {
       };
       saveConversationToFirebase(conversationId, conversationData);
     }
-  }, [history, messages, loading, activeConversationIndex, currentTitle]);
+  }, [history, messages, loading, activeConversationIndex]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -188,6 +194,7 @@ export function Chat() {
       return "Erro ao gerar título";
     }
   };
+
 
   const handleSubmit = async () => {
     const promptText = inputValue.trim();
@@ -246,6 +253,7 @@ export function Chat() {
     }, 20);
   };
 
+
   const handleKeyDown = (event: { key: string; shiftKey: any; preventDefault: () => void; }) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -296,12 +304,15 @@ export function Chat() {
     }
   };
 
+
+
   const handleNewConversation = () => {
     setMessages([]);
     setCurrentTitle(null);
     setActiveConversationIndex(null);
     console.log("Nova conversa iniciada");
   };
+
 
   const saveConversation = async (newMessages: Message[]) => {
     let updatedHistory: Conversation[] = history ? [...history] : [];
@@ -357,14 +368,15 @@ export function Chat() {
     }).join('\n');
 
     const prompt = `
-Considere a seguinte conversa entre o usuário e o chatbot. 
-Faça uma análise de sentimento vendo se o chatbot se saiu bem, indicando se o usuário ficou satisfeito com as respostas recebidas, 
-se suas expectativas foram atendidas, qual o sentimento geral da interação, e se o chatbot foi eficiente.
-Como um adendo, diga o que pode ser melhorado nesse chatbot.
+  Considere a seguinte conversa entre o usuário e o chatbot. 
+  
+  Faça uma análise de sentimento vendo se o chatbot se saiu bem, indicando se o usuário ficou satisfeito com as respostas recebidas, 
+  se suas expectativas foram atendidas, qual o sentimento geral da interação, e se o chatbot foi eficiente.
+  Como um adendo, diga o que pode ser melhorado nesse chatbot.
 
-Conversa:
-${conversationText}
-`;
+  Conversa:
+  ${conversationText}
+  `;
 
     try {
       const response = await client.post("/chat/completions", {
@@ -450,6 +462,7 @@ ${conversationText}
     }
   };
 
+
   const handleCloseFeedbackModal = () => {
     setIsFeedbackModalOpen(false);
     setModalLoading(false); // Garantir que o carregamento seja redefinido ao fechar
@@ -457,9 +470,10 @@ ${conversationText}
 
   const [selectedTab, setSelectedTab] = useState("history");
 
+
   // Função para adicionar mensagens de voz
   const addVoiceMessage = (message: VoiceMessage) => {
-    setVoiceMessages((prevMessages) => [...prevMessages, message]);
+    setVoiceMessages(prev => [...prev, message]);
   };
 
   return (
@@ -537,6 +551,7 @@ ${conversationText}
               </button>
             </TabsContent>
 
+
             <TabsContent value="history" className="p-4 overflow-auto flex-1">
               <div className="p-4 border-b">
                 <Input placeholder="Search conversations" className="w-full" />
@@ -577,8 +592,8 @@ ${conversationText}
         {/* Área de chat ou voz */}
         <div className="flex flex-col flex-1 h-full" >
           {selectedTab === "voicechat" ? (
-            <div className="flex flex-col h-full bg-background">
-              <h2 className="text-2xl font-bold mb-4 text-center">Canais de Voz</h2>
+            <div className="flex flex-col items-center justify-start h-full bg-background p-4">
+              <h2 className="text-2xl font-bold mb-4">Canais de Voz</h2>
 
               {/* Verifique o estado de `usersInCall` */}
               {usersInCall && usersInCall.length > 0 ? (
@@ -596,11 +611,11 @@ ${conversationText}
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-center">Nenhum usuário conectado ainda</p>
+                <p className="text-muted-foreground">Nenhum usuário conectado ainda</p>
               )}
 
-              {/* Exibição das mensagens de voz */}
-              <div className="w-full bg-background rounded-md p-4 mt-4 overflow-y-auto h-64">
+              {/* Exibição das mensagens da conversa */}
+              <div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
                 <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
                 <div className="space-y-2">
                   {voiceMessages.map((message, index) => (
@@ -675,6 +690,7 @@ ${conversationText}
       </div>
     </div>
   );
+
 }
 
 function ChevronDownIcon(props: React.JSX.IntrinsicAttributes & React.SVGProps<SVGSVGElement>) {
@@ -695,6 +711,8 @@ function ChevronDownIcon(props: React.JSX.IntrinsicAttributes & React.SVGProps<S
     </svg>
   );
 }
+
+
 
 function SendIcon(props: React.JSX.IntrinsicAttributes & React.SVGProps<SVGSVGElement>) {
   return (
