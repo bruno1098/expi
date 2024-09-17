@@ -541,23 +541,23 @@ export function Chat() {
                 setIsUserModalOpen={setIsUserModalOpen} // Passando o controle do modal
                 addVoiceMessage={addVoiceMessage} // Passando a função para adicionar mensagens de voz
               />
-              {usersInCall.length > 0 && (
-                <div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
-                  <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
-                  <div className="space-y-2">
-                    {voiceMessages.map((message, index) => (
-                      <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                          <p>{message.content}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {/* Elemento para scroll automático */}
-                    <div ref={messageEndRef} />
-                  </div>
-                </div>
-              )}
-
+{usersInCall.length > 0 && (
+    <div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
+      <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
+      <div className="space-y-2">
+        {voiceMessages.map((message, index) => (
+          <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+              <p>{message.content}</p>
+            </div>
+          </div>
+        ))}
+        {/* Elemento para scroll automático */}
+        <div ref={messageEndRef} />
+      </div>
+    </div>
+    )}
+              
             </TabsContent >
             <TabsContent value="modoescu" className="p-4 overflow-auto flex-1">
               <button
@@ -625,6 +625,8 @@ export function Chat() {
                         {user === 'self' ? userName : user}
                       </span>
                     </div>
+
+                    
                   ))}
                 </div>
               ) : (
@@ -635,12 +637,29 @@ export function Chat() {
               <div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
                 <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
                 <div className="space-y-2">
+
+                <div className="w-full max-w-lg bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
+      <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
+      <div className="space-y-2">
+        {voiceMessages.map((message, index) => (
+          <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+              <p>{message.content}</p>
+            </div>
+          </div>
+        ))}
+        {/* Elemento para scroll automático */}
+        <div ref={messageEndRef} />
+      </div>
+    </div>
                   {voiceMessages.map((message, index) => (
                     <div key={index} className={`flex ${message.sender === 'self' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`p-2 rounded-md max-w-xs ${message.sender === 'self' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                         <p>{message.content}</p>
                       </div>
                     </div>
+
+                    
                   ))}
                 </div>
               </div>
