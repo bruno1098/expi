@@ -205,6 +205,8 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
 - **Análises e Relatórios:** Fornece insights detalhados para tomar decisões informadas.
 
 Gostaria de agendar uma reunião com um de nossos consultores para discutir como podemos atender às suas necessidades? Podemos marcar para **quinta-feira, 25 de abril às 10h**. Esse horário funciona para você?"
+
+este sao exemplos, mas deixe de uma forma BEM MAIS RESUMIDA
     `,
         },
         ...messages.map((msg) => ({
