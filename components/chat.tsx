@@ -643,80 +643,81 @@ export function Chat() {
 
         {/* Área de Conteúdo Principal */}
         <div className="flex-1 flex flex-col bg-background">
-          {selectedTab === "voicechat" ? (
-            <div className="flex flex-col flex-1 p-4 rounded-lg shadow">
-              {/* Cabeçalho das Abas */}
-              <div className="mb-4">
-                <h2 className="text-2xl font-bold">Canais de Voz</h2>
-              </div>
+        {selectedTab === "voicechat" ? (
+  <div className="flex flex-col flex-1 p-4 rounded-lg shadow">
+    {/* Cabeçalho das Abas */}
+    <div className="mb-4">
+      <h2 className="text-2xl font-bold">Canais de Voz</h2>
+    </div>
 
-              {/* Lista de Usuários na Chamada */}
-              {usersInCall && usersInCall.length > 0 ? (
-                <div className="flex flex-wrap justify-center gap-6 w-full">
-                  {usersInCall.map((user: string, index: number) => (
-                    <div
-                      key={index}
-                      className="flex flex-col items-center bg-card p-4 rounded-lg shadow w-1/4 min-w-[150px]"
-                    >
-                      <Avatar className="w-16 h-16 bg-primary-foreground text-primary">
-                        <AvatarImage src="/user.png" alt={`User ${index}`} />
-                        <AvatarFallback>{user ? user.charAt(0) : "U"}</AvatarFallback>
-                      </Avatar>
-                      <span className="mt-2 text-center text-foreground">
-                        {user === "self" ? userName : user}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground">Nenhum usuário conectado ainda</p>
-              )}
+    {/* Lista de Usuários na Chamada */}
+    {usersInCall && usersInCall.length > 0 ? (
+      <div className="flex flex-wrap justify-center gap-6 w-full">
+        {usersInCall.map((user: string, index: number) => (
+          <div
+            key={index}
+            className="flex flex-col items-center bg-card p-4 rounded-lg shadow w-1/4 min-w-[150px]"
+          >
+            <Avatar className="w-16 h-16 bg-primary-foreground text-primary">
+              <AvatarImage src="/user.png" alt={`User ${index}`} />
+              <AvatarFallback>{user ? user.charAt(0) : "U"}</AvatarFallback>
+            </Avatar>
+            <span className="mt-2 text-center text-foreground">
+              {user === "self" ? userName : user}
+            </span>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="text-muted-foreground">Nenhum usuário conectado ainda</p>
+    )}
 
-              {/* Área de Conversa de Voz */}
-              <div className="flex flex-col flex-1 w-full bg-background rounded-md p-4 mt-6 overflow-auto">
-                <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
-                <div className="space-y-4">
-                  {voiceMessages.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`flex items-start ${message.senderId === userId ? "justify-end" : "justify-start"
-                        }`}
-                    >
-                      {message.senderId !== userId && (
-                        <div className="flex items-center mr-2">
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src="/user.png" alt={message.senderName} />
-                            <AvatarFallback>
-                              {message.senderName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="ml-2 text-sm">
-                            {message.senderName}
-                          </span>
-                        </div>
-                      )}
-                      <div
-                        className={`p-2 rounded-md max-w-md ${message.senderId === userId
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-foreground"
-                          }`}
-                      >
-                        <p>{message.content}</p>
-                      </div>
-                      {message.senderId === userId && (
-                        <div className="flex items-center ml-2">
-                          <span className="mr-2 text-sm">{userName}</span>
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src="/user.png" alt={userName} />
-                            <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+    {/* Área de Conversa de Voz */}
+    <div className="flex flex-col flex-1 w-full bg-background rounded-md p-4 mt-6 overflow-y-auto">
+      <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
+      <div className="space-y-4 pb-6"> {/* Adiciona padding-bottom para margem extra no final */}
+        {voiceMessages.map((message, index) => (
+          <div
+            key={index}
+            className={`flex items-start ${message.senderId === userId ? "justify-end" : "justify-start"
+              }`}
+          >
+            {message.senderId !== userId && (
+              <div className="flex items-center mr-2">
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src="/user.png" alt={message.senderName} />
+                  <AvatarFallback>
+                    {message.senderName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="ml-2 text-sm">
+                  {message.senderName}
+                </span>
               </div>
+            )}
+            <div
+              className={`p-2 rounded-md max-w-md ${message.senderId === userId
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground"
+                }`}
+            >
+              <p>{message.content}</p>
             </div>
+            {message.senderId === userId && (
+              <div className="flex items-center ml-2">
+                <span className="mr-2 text-sm">{userName}</span>
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src="/user.png" alt={userName} />
+                  <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+                </Avatar>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+
           ) : selectedTab === "gptvoice" ? (
             <div className="flex flex-col flex-1 p-4 rounded-lg shadow overflow-auto">
               {/* Centralizar o título principal */}
