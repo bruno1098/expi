@@ -19,9 +19,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       const availableVoices = window.speechSynthesis.getVoices();
       console.log('Vozes disponíveis:', availableVoices);
       setVoices(availableVoices);
-      if (availableVoices.length > 0 && !selectedVoice) {
-        setSelectedVoice(availableVoices[0]); // Seleciona a primeira voz disponível por padrão
-      }
+      // Não pré-seleciona uma voz para permitir que o usuário escolha ou opte por não usar voz
     };
 
     // Carregar vozes inicialmente
@@ -29,7 +27,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
 
     // Atualizar vozes quando mudarem
     window.speechSynthesis.onvoiceschanged = loadVoices;
-  }, [selectedVoice]);
+  }, []);
 
   // Inicializar o reconhecimento de fala
   useEffect(() => {
@@ -63,11 +61,6 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
         console.log('Transcrição recebida:', transcript);
         addMessage({ senderId: userId, senderName: userName || 'Você', content: transcript });
 
-        if (recognition.current) {
-          console.log('Parando reconhecimento de fala antes da síntese.');
-          recognition.current.stop();
-        }
-
         const response = await sendMessageToGPT(transcript);
 
         if (response) {
@@ -81,29 +74,16 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
 
             utterance.onstart = () => {
               setIsSpeaking(true);
+              console.log('Síntese de fala iniciada.');
             };
 
             utterance.onend = () => {
               synthesisUtterance.current = null;
               setIsSpeaking(false);
-              if (isConversationActive) {
-                console.log('Reiniciando reconhecimento de fala após síntese.');
-                recognition.current.start();
-              }
+              console.log('Síntese de fala finalizada.');
             };
 
             window.speechSynthesis.speak(utterance);
-          } else {
-            console.warn('Nenhuma voz selecionada para síntese de fala.');
-            if (isConversationActive) {
-              console.log('Reiniciando reconhecimento de fala sem síntese.');
-              recognition.current.start();
-            }
-          }
-        } else {
-          if (isConversationActive) {
-            console.log('Reiniciando reconhecimento de fala após erro na resposta.');
-            recognition.current.start();
           }
         }
       } else {
@@ -144,7 +124,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       }
       window.speechSynthesis.cancel();
     };
-  }, [userId, userName, selectedVoice, isConversationActive, isSpeaking]);
+  }, [userId, userName, selectedVoice, isConversationActive]); // Removido 'isSpeaking' das dependências
 
   // Iniciar o reconhecimento de fala e a conversa
   const startListening = async () => {
@@ -158,6 +138,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       if (recognition.current && !isConversationActive) {
         setIsConversationActive(true);
         recognition.current.start();
+        console.log('Reconhecimento de fala iniciado pelo usuário.');
       }
     } catch (err) {
       console.error('Permissão de microfone negada:', err);
@@ -170,6 +151,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
     if (recognition.current && isConversationActive) {
       setIsConversationActive(false);
       recognition.current.stop();
+      console.log('Reconhecimento de fala parado pelo usuário.');
     }
     window.speechSynthesis.cancel();
   };
@@ -252,7 +234,8 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
           value={selectedVoice ? selectedVoice.name : ''}
           onChange={(e) => {
             const voice = voices.find((v) => v.name === e.target.value);
-            setSelectedVoice(voice);
+            setSelectedVoice(voice || null); // Define como null se não encontrar
+            console.log('Voz selecionada:', voice);
           }}
           className="p-2 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white border-gray-300 dark:border-gray-600"
         >
@@ -315,12 +298,22 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       {/* Lista de Mensagens */}
       <div className="flex flex-col w-full mt-4 overflow-auto">
         {messages.map((msg, index) => (
-          <div key={index} className={`flex ${msg.senderId === 'gpt' ? 'justify-start' : 'justify-end'} mb-2`}>
+          <div
+            key={index}
+            className={`flex ${msg.senderId === 'gpt' ? 'justify-start' : 'justify-end'} mb-2`}
+          >
             <Avatar>
-              <AvatarImage src={msg.senderId === 'gpt' ? '/gpt-avatar.png' : '/user-avatar.png'} alt={msg.senderName} />
+              <AvatarImage
+                src={msg.senderId === 'gpt' ? '/gpt-avatar.png' : '/user-avatar.png'}
+                alt={msg.senderName}
+              />
               <AvatarFallback>{msg.senderName[0]}</AvatarFallback>
             </Avatar>
-            <div className={`ml-2 p-2 rounded-md ${msg.senderId === 'gpt' ? 'bg-gray-200' : 'bg-blue-500 text-white'}`}>
+            <div
+              className={`ml-2 p-2 rounded-md ${
+                msg.senderId === 'gpt' ? 'bg-gray-200' : 'bg-blue-500 text-white'
+              }`}
+            >
               {msg.content}
             </div>
           </div>
