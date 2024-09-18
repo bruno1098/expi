@@ -74,7 +74,7 @@ export function Chat() {
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userName, setUserName] = useState("");
   const [userId, setUserId] = useState("");
-
+  const [isLoading, setIsLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   // Carregar o nome e o tema salvos no localStorage na inicialização
   useEffect(() => {
@@ -555,174 +555,176 @@ export function Chat() {
         </Modal>
       )}
 
-      <div className="flex-1 flex overflow-hidden ">
-        <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col min-h-[600px]">
-          {/* Aumentando a altura mínima */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar com Abas */}
+        <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col h-full"> {/* Set h-full */}
+        <Tabs defaultValue="history" className="flex-1 flex flex-col h-full" onValueChange={(value) => setSelectedTab(value)}>
+  {/* Updated TabsList */}
+  <TabsList className="border-b flex overflow-x-auto w-full"> {/* w-full and overflow-x-auto */}
+    <TabsTrigger value="history" className="min-w-max text-center px-2 py-2">
+        Expi
+      </TabsTrigger>
+      <TabsTrigger value="voicechat" className="min-w-max text-center px-2 py-2">
+        Voice Chat
+      </TabsTrigger>
+      <TabsTrigger value="gptvoice" className="min-w-max text-center px-2 py-2">
+        Expi Express
+      </TabsTrigger>
+      <TabsTrigger value="modoescu" className="min-w-max text-center px-2 py-2">
+        Configs
+      </TabsTrigger>
+    </TabsList>
 
-          <Tabs defaultValue="history" className="h-full flex flex-col" onValueChange={(value) => setSelectedTab(value)}>
-            <TabsList className="border-b flex overflow-x-auto">
-              <TabsTrigger value="history" className="min-w-max text-center">Expi</TabsTrigger>
-              <TabsTrigger value="voicechat" className="min-w-max text-center py-2">Voice Chat</TabsTrigger>
-              <TabsTrigger value="gptvoice" className="min-w-max text-center py-2">Expi Express</TabsTrigger>
-              <TabsTrigger value="modoescu" className="min-w-max text-center">Configs</TabsTrigger>
-            </TabsList>
+    {/* Add overflow-auto to make sure content inside can scroll if needed */}
+    <TabsContent value="voicechat" className="flex-1 p-4 overflow-auto">
+      <Canais
+        usersInCall={usersInCall}
+        setUsersInCall={setUsersInCall}
+        userName={userName}
+        userId={userId}
+        setUserName={setUserName}
+        setIsUserModalOpen={setIsUserModalOpen}
+        addVoiceMessage={addVoiceMessage}
+      />
+    </TabsContent>
 
-            <TabsContent value="voicechat" className="p-4 overflow-auto flex-1">
-              <Canais
-                usersInCall={usersInCall}
-                setUsersInCall={setUsersInCall}
-                userName={userName}
-                userId={userId}
-                setUserName={setUserName}
-                setIsUserModalOpen={setIsUserModalOpen}
-                addVoiceMessage={addVoiceMessage}
-              />
-            </TabsContent>
+    <TabsContent value="gptvoice" className="flex-1 p-4 overflow-auto">
+      <GptChat userName={userName} userId={userId} onMessagesUpdate={handleMessagesUpdate} />
+    </TabsContent>
 
-            <TabsContent value="gptvoice" className="p-4 overflow-auto flex-1">
-              
-                <GptChat userName={userName} userId={userId} onMessagesUpdate={handleMessagesUpdate} />
-              
-            </TabsContent>
+    <TabsContent value="modoescu" className="flex-1 p-4 overflow-auto">
+      <button
+        onClick={toggleTheme}
+        className="p-2 bg-primary text-primary-foreground rounded-lg"
+      >
+        {isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
+      </button>
+    </TabsContent>
 
-
-
-
-
-            <TabsContent value="modoescu" className="p-4 overflow-auto flex-1">
-              <button
-                onClick={toggleTheme}
-                className="p-2 bg-primary text-primary-foreground rounded-lg"
-              >
-                {isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
-              </button>
-            </TabsContent>
-
-            <TabsContent value="history" className="p-4 overflow-auto flex-1">
-              <div className="p-4 border-b">
-                <Input placeholder="Search conversations" className="w-full" />
+    <TabsContent value="history" className="flex-1 p-4 overflow-auto">
+      <div className="p-4 border-b">
+        <Input placeholder="Search conversations" className="w-full" />
+      </div>
+      <div className="p-4 overflow-auto flex-1">
+        {history.length > 0 ? (
+          history.map((conversation, index) => (
+            <div key={index} className="flex items-center justify-between p-3 rounded-md hover:bg-muted cursor-pointer">
+              <div className="flex items-center gap-4" onClick={() => handleSelectConversation(index)}>
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src="/user.png" alt="User" />
+                  <AvatarFallback>H</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h4 className="font-medium">{conversation.title}</h4>
+                </div>
               </div>
-              <div className="p-4 overflow-auto flex-1">
-                {history.length > 0 ? (
-                  history.map((conversation, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-md hover:bg-muted cursor-pointer">
-                      <div className="flex items-center gap-4" onClick={() => handleSelectConversation(index)}>
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src="/user.png" alt="User" />
-                          <AvatarFallback>H</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h4 className="font-medium">{conversation.title}</h4>
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="p-2 rounded-full">
-                            <MoreHorizontalIcon className="w-5 h-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleDeleteConversation(index)}>
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="p-2 rounded-full">
+                    <MoreHorizontalIcon className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleDeleteConversation(index)}>
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ))
+        ) : (
+          <p className="text-center text-muted-foreground">Nenhuma conversa ainda</p>
+        )}
+      </div>
+    </TabsContent>
+  </Tabs>
+</div>
+
+
+        {/* Área de Conteúdo Principal */}
+        <div className="flex-1 flex flex-col bg-background">
+          {selectedTab === "voicechat" ? (
+            <div className="flex flex-col flex-1 p-4 rounded-lg shadow">
+              {/* Cabeçalho das Abas */}
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold">Canais de Voz</h2>
+              </div>
+
+              {/* Lista de Usuários na Chamada */}
+              {usersInCall && usersInCall.length > 0 ? (
+                <div className="flex flex-wrap justify-center gap-6 w-full">
+                  {usersInCall.map((user: string, index: number) => (
+                    <div
+                      key={index}
+                      className="flex flex-col items-center bg-card p-4 rounded-lg shadow w-1/4 min-w-[150px]"
+                    >
+                      <Avatar className="w-16 h-16 bg-primary-foreground text-primary">
+                        <AvatarImage src="/user.png" alt={`User ${index}`} />
+                        <AvatarFallback>{user ? user.charAt(0) : "U"}</AvatarFallback>
+                      </Avatar>
+                      <span className="mt-2 text-center text-foreground">
+                        {user === "self" ? userName : user}
+                      </span>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-center text-muted-foreground">Nenhuma conversa ainda</p>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* Área de chat ou voz */}
-
-        <div className="flex flex-col min-h-screen w-full py-4 px-4 bg-background">
-  {selectedTab === "voicechat" ? (
-    <div className="flex flex-col flex-1 bg-background p-4 rounded-lg shadow">
-      {/* Cabeçalho das Abas */}
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold">Canais de Voz</h2>
-      </div>
-
-      {/* Lista de Usuários na Chamada */}
-      {usersInCall && usersInCall.length > 0 ? (
-        <div className="flex flex-wrap justify-center gap-6 w-full">
-          {usersInCall.map((user: string, index: number) => (
-            <div
-              key={index}
-              className="flex flex-col items-center bg-card p-4 rounded-lg shadow w-1/4 min-w-[150px]"
-            >
-              <Avatar className="w-16 h-16 bg-primary-foreground text-primary">
-                <AvatarImage src="/user.png" alt={`User ${index}`} />
-                <AvatarFallback>{user ? user.charAt(0) : "U"}</AvatarFallback>
-              </Avatar>
-              <span className="mt-2 text-center text-foreground">
-                {user === "self" ? userName : user}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-muted-foreground">Nenhum usuário conectado ainda</p>
-      )}
-
-      {/* Área de Conversa de Voz */}
-      <div className="flex flex-col flex-1 w-full bg-background rounded-md p-4 mt-6 overflow-auto">
-        <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
-        <div className="space-y-4">
-          {voiceMessages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex items-start ${
-                message.senderId === userId ? "justify-end" : "justify-start"
-              }`}
-            >
-              {message.senderId !== userId && (
-                <div className="flex items-center mr-2">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src="/user.png" alt={message.senderName} />
-                    <AvatarFallback>
-                      {message.senderName.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="ml-2 text-sm">
-                    {message.senderName}
-                  </span>
+                  ))}
                 </div>
+              ) : (
+                <p className="text-muted-foreground">Nenhum usuário conectado ainda</p>
               )}
-              <div
-                className={`p-2 rounded-md max-w-md ${
-                  message.senderId === userId
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
-                }`}
-              >
-                <p>{message.content}</p>
-              </div>
-              {message.senderId === userId && (
-                <div className="flex items-center ml-2">
-                  <span className="mr-2 text-sm">{userName}</span>
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src="/user.png" alt={userName} />
-                    <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
 
-          ) : selectedTab === "gptvoice" ? (
-            <div className="flex flex-col items-center justify-start h-full bg-background p-4">
-              <h2 className="text-2xl font-bold mb-4">Conversa com Expi Express</h2>
-
-              <div className="w-full max-w-2xl bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
+              {/* Área de Conversa de Voz */}
+              <div className="flex flex-col flex-1 w-full bg-background rounded-md p-4 mt-6 overflow-auto">
                 <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
+                <div className="space-y-4">
+                  {voiceMessages.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-start ${message.senderId === userId ? "justify-end" : "justify-start"
+                        }`}
+                    >
+                      {message.senderId !== userId && (
+                        <div className="flex items-center mr-2">
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src="/user.png" alt={message.senderName} />
+                            <AvatarFallback>
+                              {message.senderName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="ml-2 text-sm">
+                            {message.senderName}
+                          </span>
+                        </div>
+                      )}
+                      <div
+                        className={`p-2 rounded-md max-w-md ${message.senderId === userId
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground"
+                          }`}
+                      >
+                        <p>{message.content}</p>
+                      </div>
+                      {message.senderId === userId && (
+                        <div className="flex items-center ml-2">
+                          <span className="mr-2 text-sm">{userName}</span>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src="/user.png" alt={userName} />
+                            <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : selectedTab === "gptvoice" ? (
+            <div className="flex flex-col flex-1 p-4 rounded-lg shadow overflow-auto">
+              {/* Centralizar o título principal */}
+              <h2 className="text-2xl font-bold mb-4 text-center">Conversa com Expi Express</h2>
+
+              <div className="w-full max-w-2xl mx-auto bg-background rounded-md p-4 mt-6 overflow-y-auto h-full">
+                {/* Centralizar o subtítulo da conversa de voz */}
+                <h3 className="text-lg font-semibold mb-2 text-center">Conversa de Voz</h3>
                 <div className="space-y-4">
                   {gptMessages.map((message, index) => (
                     <div key={index} className={`flex items-start ${message.senderId === userId ? 'justify-end' : 'justify-start'}`}>
@@ -749,70 +751,82 @@ export function Chat() {
                       )}
                     </div>
                   ))}
+
+                  {/* Indicador de Carregamento */}
+                  {isLoading && (
+                    <div className="flex items-center justify-start mt-4">
+                      <div className="loader"></div>
+                      <span className="ml-2">Aguardando resposta...</span>
+                    </div>
+                  )}
+
                 </div>
               </div>
             </div>
+
+
           ) : (
             <>
-            <div className="flex-1 p-6 overflow-auto h-[calc(100vh-150px)]">
-              <div className="grid gap-4 ">
-                {messages.map((message, index) => (
-                  <div key={index} className={`flex items-start gap-4 ${message.role === "user" ? "justify-end" : ""}`}>
-                    {message.role === "ai" && (
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src="/logo.png" alt="Chatbot" />
-                        <AvatarFallback>CB</AvatarFallback>
-                      </Avatar>
-                    )}
-                    <div className={`p-4 rounded-lg max-w-[80%] ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                      <p>{message.content}</p>
+              <div className="flex-1 p-6 overflow-auto">
+                <div className="grid gap-4">
+                  {messages.map((message, index) => (
+                    <div key={index} className={`flex items-start gap-4 ${message.role === "user" ? "justify-end" : ""}`}>
+                      {message.role === "ai" && (
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src="/logo.png" alt="Chatbot" />
+                          <AvatarFallback>CB</AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className={`p-4 rounded-lg max-w-[80%] ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                        <p>{message.content}</p>
+                      </div>
+                      {message.role === "user" && (
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src="/user.png" alt="User" />
+                          <AvatarFallback>U</AvatarFallback>
+                        </Avatar>
+                      )}
                     </div>
-                    {message.role === "user" && (
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src="/user.png" alt="User" />
-                        <AvatarFallback>U</AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                ))}
-                {loading && (
-                  <div className="flex justify-center">
-                    <p>Digitando...</p>
-                  </div>
-                )}
+                  ))}
+                  {loading && (
+                    <div className="flex justify-center">
+                      <p>Digitando...</p>
+                    </div>
+                  )}
+                </div>
+                <div ref={messageEndRef} />
               </div>
-              <div ref={messageEndRef} />
-            </div>
 
-            <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
-              <Textarea
-                placeholder="Digite sua mensagem..."
-                className="flex-1 mr-4 resize-none h-12"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-              <Button onClick={handleSubmit}>
-                <SendIcon className="w-5 h-5" />
-              </Button>
-              <Button onClick={handleOpenFeedbackModal} variant="outline" className="ml-2">
-                Finalizar Conversa
-              </Button>
-              <Modal
-                isOpen={isFeedbackModalOpen}
-                onClose={handleCloseFeedbackModal}
-                title={modalTitle}
-                isLoading={modalLoading}
-              >
-                <p>{feedbackAnalysis || "Seu feedback foi enviado com sucesso!"}</p>
-              </Modal>
-            </div>
-          </>
-        )}
+              <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
+                <Textarea
+                  placeholder="Digite sua mensagem..."
+                  className="flex-1 mr-4 resize-none h-12"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+                <Button onClick={handleSubmit}>
+                  <SendIcon className="w-5 h-5" />
+                </Button>
+                <Button onClick={handleOpenFeedbackModal} variant="outline" className="ml-2">
+                  Finalizar Conversa
+                </Button>
+                <Modal
+                  isOpen={isFeedbackModalOpen}
+                  onClose={handleCloseFeedbackModal}
+                  title={modalTitle}
+                  isLoading={modalLoading}
+                >
+                  <p>{feedbackAnalysis || "Seu feedback foi enviado com sucesso!"}</p>
+                </Modal>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+
 
 
 }

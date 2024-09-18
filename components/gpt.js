@@ -4,12 +4,12 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'; //
 
 const GptChat = ({ userName, userId, onMessagesUpdate }) => {
   const [messages, setMessages] = useState([]);
-  const [isListening, setIsListening] = useState(false);
-  const [shouldRestartRecognition, setShouldRestartRecognition] = useState(false);
+  const [isConversationActive, setIsConversationActive] = useState(false); // Novo estado para controlar a conversa
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const recognition = useRef(null);
+  const synthesisUtterance = useRef(null); // Referência para controlar a síntese de fala
 
   // Carregar vozes disponíveis
   useEffect(() => {
@@ -42,41 +42,68 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
         // Adiciona a mensagem do usuário à lista
         addMessage({ senderId: userId, senderName: userName || 'Você', content: transcript });
 
+        // Interrompe o reconhecimento de fala antes de enviar a mensagem
+        if (recognition.current) {
+          recognition.current.stop();
+        }
+
         // Envia a mensagem para a API da OpenAI
         const response = await sendMessageToGPT(transcript);
 
         if (response) {
           // Adiciona a resposta do GPT à lista de mensagens
-          addMessage({ senderId: 'gpt', senderName: 'GPT', content: response });
+          addMessage({ senderId: 'gpt', senderName: 'Expi', content: response });
 
           // Adicionar síntese de fala para a resposta do GPT
           if (selectedVoice) {
             console.log('Usando a voz selecionada:', selectedVoice.name); // Log para depuração
             const utterance = new SpeechSynthesisUtterance(response);
             utterance.voice = selectedVoice;
+            synthesisUtterance.current = utterance; // Armazena a referência da síntese atual
+
+            // Ao finalizar a fala, retomar o reconhecimento de fala se a conversa estiver ativa
+            utterance.onend = () => {
+              synthesisUtterance.current = null;
+              if (isConversationActive) {
+                recognition.current.start();
+              }
+            };
+
             window.speechSynthesis.speak(utterance);
           } else {
             console.warn('Nenhuma voz selecionada para síntese de fala.');
+            // Se nenhuma voz estiver selecionada, retome o reconhecimento imediatamente
+            if (isConversationActive) {
+              recognition.current.start();
+            }
+          }
+        } else {
+          // Se houve um erro na resposta, retome o reconhecimento
+          if (isConversationActive) {
+            recognition.current.start();
           }
         }
       }
     };
 
     recognition.current.onstart = () => {
-      setIsListening(true);
+      console.log('Reconhecimento de fala iniciado.');
     };
 
     recognition.current.onend = () => {
-      setIsListening(false);
-
-      if (shouldRestartRecognition) {
+      console.log('Reconhecimento de fala finalizado.');
+      if (isConversationActive && !synthesisUtterance.current) {
+        // Reinicia o reconhecimento se a conversa estiver ativa e não estiver sintetizando fala
         recognition.current.start();
-        setShouldRestartRecognition(false);
       }
     };
 
     recognition.current.onerror = (event) => {
       console.error('Erro no reconhecimento de fala:', event.error);
+      // Tente reiniciar o reconhecimento se houver um erro e a conversa estiver ativa
+      if (isConversationActive) {
+        recognition.current.start();
+      }
     };
 
     return () => {
@@ -84,21 +111,25 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
         recognition.current.stop();
         recognition.current = null;
       }
+      window.speechSynthesis.cancel();
     };
-  }, [userId, userName, shouldRestartRecognition, selectedVoice]);
+  }, [userId, userName, selectedVoice, isConversationActive]);
 
-  // Iniciar o reconhecimento de fala
+  // Iniciar o reconhecimento de fala e a conversa
   const startListening = () => {
-    if (recognition.current && !isListening) {
+    if (recognition.current && !isConversationActive) {
+      setIsConversationActive(true);
       recognition.current.start();
     }
   };
 
-  // Parar o reconhecimento de fala
+  // Parar o reconhecimento de fala e a síntese de fala
   const stopListening = () => {
-    if (recognition.current && isListening) {
+    if (recognition.current && isConversationActive) {
+      setIsConversationActive(false);
       recognition.current.stop();
     }
+    window.speechSynthesis.cancel();
   };
 
   // Adicionar mensagem ao estado e notificar o componente pai
@@ -118,7 +149,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       setIsLoading(true);
 
       const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
-      const apiUrl = 'https://api.openai.com/v1/chat/completions';
+const apiUrl = 'https://api.openai.com/v1/chat/completions';
 
       // Construir o histórico de mensagens
       const conversation = [
@@ -128,6 +159,12 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
             Você é um atendente de suporte ao cliente altamente eficiente e amigável.
             Elabore respostas fictícias caso a pessoa peça algo que não está ao seu alcance, 
             como por exemplo marcar uma consulta com um médico.
+
+            Mantenha o contexto das conversas anteriores para fornecer respostas coerentes. 
+
+            Caso alguém peça para marcar uma consulta, invente um contexto e marque a consulta para essa pessoa. 
+            Seja breve e não solicite muitas informações, mantenha a naturalidade (sem mencionar que é fictício).
+            nunca solicite para o usuario entrar em contato com outra pessoa, vc tem que informar que tudo está feito, que vc marcou, vc viu a agenda, tuod é voce
           `
         },
         ...messages.map((msg) => ({
@@ -151,7 +188,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       const assistantMessage = response.data.choices[0].message.content.trim();
       return assistantMessage; // Retorne a mensagem para ser adicionada e sintetizada
     } catch (error) {
-      console.error('Erro ao enviar mensagem para o :', error);
+      console.error('Erro ao enviar mensagem :', error);
       return null;
     } finally {
       setIsLoading(false);
@@ -185,7 +222,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
 
       {/* Botões para controlar o reconhecimento de fala */}
       <div className="mb-4">
-        {!isListening ? (
+        {!isConversationActive ? (
           <button
             onClick={startListening}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
@@ -227,6 +264,8 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
           <span className="ml-2">Aguardando resposta...</span>
         </div>
       )}
+
+
     </div>
   );
 };
