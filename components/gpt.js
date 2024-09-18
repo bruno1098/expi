@@ -148,7 +148,6 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
     try {
       setIsLoading(true);
 
-      const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
 const apiUrl = 'https://api.openai.com/v1/chat/completions';
 
       // Construir o histórico de mensagens
@@ -180,7 +179,7 @@ const apiUrl = 'https://api.openai.com/v1/chat/completions';
       }, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
         },
       });
 

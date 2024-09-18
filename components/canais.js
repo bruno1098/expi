@@ -392,8 +392,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
   };
 
   const analyzeConversationWithGPT = async (conversation) => {
-    const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY; // Sua chave da API
-
+   
     try {
       // Verificar se a conversa é válida
       if (!conversation || conversation.trim() === "") {
@@ -424,7 +423,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
           },
         }
       );
