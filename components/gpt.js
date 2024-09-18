@@ -296,29 +296,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       )}
 
       {/* Lista de Mensagens */}
-      <div className="flex flex-col w-full mt-4 overflow-auto">
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`flex ${msg.senderId === 'gpt' ? 'justify-start' : 'justify-end'} mb-2`}
-          >
-            <Avatar>
-              <AvatarImage
-                src={msg.senderId === 'gpt' ? '/gpt-avatar.png' : '/user-avatar.png'}
-                alt={msg.senderName}
-              />
-              <AvatarFallback>{msg.senderName[0]}</AvatarFallback>
-            </Avatar>
-            <div
-              className={`ml-2 p-2 rounded-md ${
-                msg.senderId === 'gpt' ? 'bg-gray-200' : 'bg-blue-500 text-white'
-              }`}
-            >
-              {msg.content}
-            </div>
-          </div>
-        ))}
-      </div>
+   
     </div>
   );
 };
