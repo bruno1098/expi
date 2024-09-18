@@ -510,12 +510,12 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
         <h3 className="text-lg font-semibold mb-2">Canais</h3>
         <ul className="space-y-2">
           <li
-            className={`flex flex-col items-start p-2 rounded cursor-pointer bg-muted ${currentChannel === 'Tudo que eu quero' ? 'bg-primary' : ''}`}
-            onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Tudo que eu quero'))}
+            className={`flex flex-col items-start p-2 rounded cursor-pointer bg-muted ${currentChannel === 'Canal de voz 1' ? 'bg-primary' : ''}`}
+            onClick={() => (isInCall ? leaveVoiceChannel() : enterVoiceChannel('Canal de voz 1'))}
           >
-            <span className="text-foreground">Tudo que eu quero</span>
+            <span className="text-foreground">Canal de voz 1</span>
 
-            {currentChannel === 'Tudo que eu quero' && usersInCall.length > 0 && (
+            {currentChannel === 'Canal de voz 1' && usersInCall.length > 0 && (
               <ul className="pl-4 pt-2 space-y-1">
                 {usersInCall.map((user, index) => (
                   <li key={index} className="flex items-center space-x-2">
