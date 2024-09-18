@@ -204,7 +204,7 @@ export function Chat() {
 
     try {
       const response = await client.post("/chat/completions", {
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: "Você é um assistente útil que gera títulos descritivos e concisos para conversas." },
           { role: "user", content: prompt }
@@ -226,7 +226,7 @@ export function Chat() {
     if (promptText) {
       setLoading(true);
       const data = {
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [{ role: "user" as const, content: promptText }],
       };
 
@@ -405,7 +405,7 @@ export function Chat() {
 
     try {
       const response = await client.post("/chat/completions", {
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: "Você é um assistente útil que analisa feedbacks de conversas." },
           { role: "user", content: prompt }
@@ -427,7 +427,7 @@ export function Chat() {
     `;
 
       const categorizationResponse = await client.post("/chat/completions", {
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: "Você é um assistente útil que categoriza feedbacks." },
           { role: "user", content: categorizationPrompt }

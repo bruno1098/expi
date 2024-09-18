@@ -182,7 +182,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
 
 1. **Agradecimento Inicial:**
    - Inicie com uma mensagem calorosa, por exemplo:
-     "Fico feliz que você queira contratar nosso serviço Hike for Sales!"
+     "Fico feliz que você queira contratar nosso serviço Hike for Sales! e pelo que busquei na nossa base de dados, o melhor servivço para vc é:"
 
 2. **Apresentação dos Benefícios:**
    - Liste os principais benefícios da plataforma, destacando como ela maximiza a eficiência e a gestão das operações comerciais. Utilize marcadores para clareza. Por exemplo:
@@ -219,7 +219,7 @@ este sao exemplos, mas deixe de uma forma BEM MAIS RESUMIDA
       const response = await axios.post(
         apiUrl,
         {
-          model: 'gpt-4',
+          model: 'gpt-4o',
           messages: conversation,
         },
         {

@@ -403,13 +403,14 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
-          model: "gpt-3.5-turbo",
+          model: "gpt-4o",
           messages: [
             { role: "system", content: "Você é um assistente que analisa conversas de atendimento ao cliente." },
             {
               role: "user", content: `
-              Analise a seguinte conversa de atendimento ao cliente. Identifique quem é o cliente e quem é o atendente com base em palavras-chave.
-              Analise o sentimento da conversa e determine se o cliente foi atendido de forma correta, se ficou satisfeito ou insatisfeito, e forneça feedback sobre como melhorar o atendimento.
+              Analise a seguinte conversa de atendimento ao cliente. Identifique quem é o cliente e quem é o atendente com base em palavras-chave como por exemplo "Sou o atendente como posso te ajudar".
+              Analise o sentimento da conversa e determine se o cliente foi atendido de forma correta, se ficou satisfeito ou insatisfeito,
+              e forneça feedback sobre como melhorar o atendimento.
   
               Conversa:
               ${conversation}
@@ -449,7 +450,7 @@ const Canais = ({ usersInCall, setUsersInCall, userName, setUserName, userId, se
       const categorizationResponse = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
-          model: "gpt-3.5-turbo",
+          model: "gpt-4o",
           messages: [
             { role: "system", content: "Você é um assistente que categoriza feedbacks." },
             { role: "user", content: categorizationPrompt },
