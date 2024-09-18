@@ -644,7 +644,7 @@ export function Chat() {
         {/* Área de Conteúdo Principal */}
         <div className="flex-1 flex flex-col bg-background">
   {selectedTab === "voicechat" ? (
-    <div className="flex flex-col flex-1 p-4 rounded-lg shadow">
+    <div className="flex flex-col flex-1 p-4 rounded-lg shadow h-full">
       
       {/* Cabeçalho das Abas */}
       <div className="mb-4">
@@ -674,54 +674,55 @@ export function Chat() {
       )}
 
       {/* Área de Conversa de Voz com Rolagem */}
-      <div className="flex flex-col flex-1 w-full bg-background rounded-md p-4 mt-2 overflow-y-auto">
+      <div className="flex flex-col flex-1 w-full bg-background rounded-md p-4 mt-2">
         <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
-        <div className="space-y-4 pb-12"> {/* Adiciona padding-bottom para margem extra no final */}
-          {voiceMessages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex items-start ${
-                message.senderId === userId ? "justify-end" : "justify-start"
-              }`}
-            >
-              {message.senderId !== userId && (
-                <div className="flex items-center mr-2">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src="/user.png" alt={message.senderName} />
-                    <AvatarFallback>
-                      {message.senderName.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="ml-2 text-sm">
-                    {message.senderName}
-                  </span>
-                </div>
-              )}
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 pb-12">
+            {voiceMessages.map((message, index) => (
               <div
-                className={`p-2 rounded-md max-w-md ${
-                  message.senderId === userId
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
+                key={index}
+                className={`flex items-start ${
+                  message.senderId === userId ? "justify-end" : "justify-start"
                 }`}
               >
-                <p>{message.content}</p>
-              </div>
-              {message.senderId === userId && (
-                <div className="flex items-center ml-2">
-                  <span className="mr-2 text-sm">{userName}</span>
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src="/user.png" alt={userName} />
-                    <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
-                  </Avatar>
+                {message.senderId !== userId && (
+                  <div className="flex items-center mr-2">
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src="/user.png" alt={message.senderName} />
+                      <AvatarFallback>
+                        {message.senderName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="ml-2 text-sm">
+                      {message.senderName}
+                    </span>
+                  </div>
+                )}
+                <div
+                  className={`p-2 rounded-md max-w-md ${
+                    message.senderId === userId
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground"
+                  }`}
+                >
+                  <p>{message.content}</p>
                 </div>
-              )}
-            </div>
-          ))}
+                {message.senderId === userId && (
+                  <div className="flex items-center ml-2">
+                    <span className="mr-2 text-sm">{userName}</span>
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src="/user.png" alt={userName} />
+                      <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       
-    </div> // Fecha a div do selectedTab === "voicechat"
-
+    </div>
 
           ) : selectedTab === "gptvoice" ? (
             <div className="flex flex-col flex-1 p-4 rounded-lg shadow overflow-auto">
