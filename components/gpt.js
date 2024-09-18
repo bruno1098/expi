@@ -8,7 +8,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false); // Nova flag para controlar a síntese de fala
+  const [isSpeaking, setIsSpeaking] = useState(false); // Flag para controlar a síntese de fala
   const recognition = useRef(null);
   const synthesisUtterance = useRef(null);
   const lastTranscript = useRef(''); // Ref para armazenar a última transcrição
@@ -24,10 +24,18 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       }
     };
 
+    // Carregar vozes inicialmente
     loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
 
-    // Inicializar o reconhecimento de fala
+    // Atualizar vozes quando mudarem
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, [selectedVoice]);
+
+  // Inicializar o reconhecimento de fala
+  useEffect(() => {
+    // Verificar se estamos no ambiente do navegador
+    if (typeof window === 'undefined') return;
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       console.error('API de reconhecimento de fala não suportada neste navegador.');
@@ -35,7 +43,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
     }
 
     recognition.current = new SpeechRecognition();
-    recognition.current.continuous = false; // Altere para false
+    recognition.current.continuous = true; // Manter reconhecimento contínuo
     recognition.current.interimResults = false;
     recognition.current.lang = 'pt-BR';
 
@@ -51,7 +59,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
       // Verifique se a transcrição é diferente da última
       if (transcript && transcript !== lastTranscript.current) {
         lastTranscript.current = transcript;
-        
+
         console.log('Transcrição recebida:', transcript);
         addMessage({ senderId: userId, senderName: userName || 'Você', content: transcript });
 
@@ -80,9 +88,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
               setIsSpeaking(false);
               if (isConversationActive) {
                 console.log('Reiniciando reconhecimento de fala após síntese.');
-                setTimeout(() => {
-                  recognition.current.start();
-                }, 500); // Atraso de 500ms
+                recognition.current.start();
               }
             };
 
@@ -91,17 +97,13 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
             console.warn('Nenhuma voz selecionada para síntese de fala.');
             if (isConversationActive) {
               console.log('Reiniciando reconhecimento de fala sem síntese.');
-              setTimeout(() => {
-                recognition.current.start();
-              }, 500);
+              recognition.current.start();
             }
           }
         } else {
           if (isConversationActive) {
             console.log('Reiniciando reconhecimento de fala após erro na resposta.');
-            setTimeout(() => {
-              recognition.current.start();
-            }, 500);
+            recognition.current.start();
           }
         }
       } else {
@@ -116,17 +118,15 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
     recognition.current.onend = () => {
       console.log('Reconhecimento de fala finalizado.');
       if (isConversationActive && !isSpeaking) {
-        console.log('Reiniciando reconhecimento de fala em 500ms...');
-        setTimeout(() => {
-          recognition.current.start();
-        }, 500); // 500ms de atraso
+        console.log('Reiniciando reconhecimento de fala...');
+        recognition.current.start();
       }
     };
 
     recognition.current.onerror = (event) => {
       console.error('Erro no reconhecimento de fala:', event.error);
       if (isConversationActive) {
-        console.log('Tentando reiniciar reconhecimento de fala após erro em 1s...');
+        console.log('Tentando reiniciar reconhecimento de fala após erro...');
         setTimeout(() => {
           try {
             recognition.current.start();
@@ -204,7 +204,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
 
             Caso alguém peça para marcar uma consulta, invente um contexto e marque a consulta para essa pessoa. 
             Seja breve e não solicite muitas informações, mantenha a naturalidade (sem mencionar que é fictício).
-            nunca solicite para o usuario entrar em contato com outra pessoa, vc tem que informar que tudo está feito, que vc marcou, vc viu a agenda, tuod é voce
+            nunca solicite para o usuario entrar em contato com outra pessoa, vc tem que informar que tudo está feito, que vc marcou, vc viu a agenda, tudo é você
           `,
         },
         ...messages.map((msg) => ({
@@ -311,6 +311,21 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
           <span className="ml-2">Aguardando resposta...</span>
         </div>
       )}
+
+      {/* Lista de Mensagens */}
+      <div className="flex flex-col w-full mt-4 overflow-auto">
+        {messages.map((msg, index) => (
+          <div key={index} className={`flex ${msg.senderId === 'gpt' ? 'justify-start' : 'justify-end'} mb-2`}>
+            <Avatar>
+              <AvatarImage src={msg.senderId === 'gpt' ? '/gpt-avatar.png' : '/user-avatar.png'} alt={msg.senderName} />
+              <AvatarFallback>{msg.senderName[0]}</AvatarFallback>
+            </Avatar>
+            <div className={`ml-2 p-2 rounded-md ${msg.senderId === 'gpt' ? 'bg-gray-200' : 'bg-blue-500 text-white'}`}>
+              {msg.content}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
