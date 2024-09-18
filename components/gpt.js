@@ -15,6 +15,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
   useEffect(() => {
     const loadVoices = () => {
       const availableVoices = window.speechSynthesis.getVoices();
+      console.log('Vozes disponíveis:', availableVoices); // Log para depuração
       setVoices(availableVoices);
     };
 
@@ -47,6 +48,16 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
         if (response) {
           // Adiciona a resposta do GPT à lista de mensagens
           addMessage({ senderId: 'gpt', senderName: 'GPT', content: response });
+
+          // Adicionar síntese de fala para a resposta do GPT
+          if (selectedVoice) {
+            console.log('Usando a voz selecionada:', selectedVoice.name); // Log para depuração
+            const utterance = new SpeechSynthesisUtterance(response);
+            utterance.voice = selectedVoice;
+            window.speechSynthesis.speak(utterance);
+          } else {
+            console.warn('Nenhuma voz selecionada para síntese de fala.');
+          }
         }
       }
     };
@@ -74,7 +85,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
         recognition.current = null;
       }
     };
-  }, [userId, userName, shouldRestartRecognition]);
+  }, [userId, userName, shouldRestartRecognition, selectedVoice]);
 
   // Iniciar o reconhecimento de fala
   const startListening = () => {
@@ -136,10 +147,12 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
         },
       });
 
+      // Dentro da função sendMessageToGPT, após adicionar a mensagem do GPT
       const assistantMessage = response.data.choices[0].message.content.trim();
-      addMessage({ senderId: 'gpt', senderName: 'GPT', content: assistantMessage });
+      return assistantMessage; // Retorne a mensagem para ser adicionada e sintetizada
     } catch (error) {
-      console.error('Erro ao enviar mensagem para o GPT:', error);
+      console.error('Erro ao enviar mensagem para o :', error);
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -147,7 +160,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
 
   return (
     <div className="flex flex-col items-center justify-start h-full bg-background p-4">
-      <h2 className="text-2xl font-bold mb-4">Conversa com o GPT</h2>
+      <h2 className="text-2xl font-bold mb-4">Expi Express</h2>
 
       {/* Seletor de voz */}
       <div className="mb-4">
@@ -161,6 +174,7 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
           }}
           className="p-2 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white border-gray-300 dark:border-gray-600"
         >
+          <option value="">-- Selecione uma voz --</option> {/* Opção padrão */}
           {voices.filter((voice) => voice.lang.includes('pt')).map((voice, index) => (
             <option key={index} value={voice.name}>
               {voice.name} ({voice.lang})
@@ -186,6 +200,24 @@ const GptChat = ({ userName, userId, onMessagesUpdate }) => {
             Parar Conversa
           </button>
         )}
+      </div>
+
+      {/* Botão de teste de síntese de fala */}
+      <div className="mb-4">
+        <button
+          onClick={() => {
+            if (selectedVoice) {
+              const utterance = new SpeechSynthesisUtterance('Teste de síntese de fala.');
+              utterance.voice = selectedVoice;
+              window.speechSynthesis.speak(utterance);
+            } else {
+              alert('Por favor, selecione uma voz primeiro.');
+            }
+          }}
+          className="px-4 py-2 bg-secondary text-white rounded-md"
+        >
+          Testar Síntese de Fala
+        </button>
       </div>
 
       {/* Indicador de carregamento */}

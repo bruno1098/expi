@@ -695,7 +695,7 @@ export function Chat() {
             </div>
           ) : selectedTab === "gptvoice" ? (
             <div className="flex flex-col items-center justify-start h-full bg-background p-4">
-              <h2 className="text-2xl font-bold mb-4">Conversa com o GPT</h2>
+              <h2 className="text-2xl font-bold mb-4">Conversa com Expi Express</h2>
 
               <div className="w-full max-w-2xl bg-background rounded-md p-4 mt-6 overflow-y-auto h-80">
                 <h3 className="text-lg font-semibold mb-2">Conversa de Voz</h3>
@@ -705,7 +705,7 @@ export function Chat() {
                       {message.senderId !== userId && (
                         <div className="flex items-center mr-2">
                           <Avatar className="w-8 h-8">
-                            <AvatarImage src="/user.png" alt={message.senderName} />
+                            <AvatarImage src="/logo.png" alt={message.senderName} />
                             <AvatarFallback>{message.senderName.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <span className="ml-2 text-sm">{message.senderName}</span>
