@@ -14,7 +14,6 @@ import { saveConversationToFirebase, deleteConversationFromFirebase, getNextConv
 import GPTVoiceChat from './gpt'; // Certifique-se de ajustar o caminho conforme necessário
 import TutorialExpi from './TutorialExpi'; // Supondo que o arquivo Tutorial.tsx esteja na mesma pasta
 import TutorialVoice from './TutorialVoice'; // Supondo que o arquivo Tutorial.tsx esteja na mesma pasta
-import { sendEmail } from '../pages/api/sendEmail'; // Importe a função de envio de e-mail
 
 import axios from "axios";
 import { SettingsIcon, MoreHorizontalIcon } from "lucide-react";
@@ -396,7 +395,7 @@ export function Chat() {
   
     const prompt = `
       Considere a seguinte conversa entre o usuário e o chatbot. 
-    
+  
       Faça uma análise de sentimento vendo se o chatbot se saiu bem, indicando se o usuário ficou satisfeito com as respostas recebidas, 
       se suas expectativas foram atendidas, qual o sentimento geral da interação, e se o chatbot foi eficiente.
       Como um adendo, diga o que pode ser melhorado nesse chatbot.
@@ -417,8 +416,6 @@ export function Chat() {
       });
   
       const analysis = response.data.choices[0].message.content.trim();
-  
-      // Alteração do título do e-mail
       const emailSubject = `EXPI - Feedback da sua conversa com o chatbot`;
       const emailText = `Aqui está o feedback da sua conversa com o chatbot:\n\n${analysis}\n\nConversa:\n${conversationText}`;
       const emailHtml = `
@@ -436,9 +433,9 @@ export function Chat() {
         html: emailHtml
       });
   
-  
       setModalLoading(false);
   
+      // Continua com a análise de feedback
       const categorizationPrompt = `
         Dado o seguinte feedback:
   
@@ -503,14 +500,13 @@ export function Chat() {
       setModalLoading(false);
   
     } catch (error) {
-      console.error("Erro ao enviar feedback:", error);
+      console.error("Erro ao enviar feedback e e-mail:", error);
       setModalTitle("Erro na Análise");
       setTitleColor("text-red-500");
       setModalLoading(false);
     }
   };
   
-
 
   const handleCloseFeedbackModal = () => {
     setIsFeedbackModalOpen(false);
