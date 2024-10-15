@@ -8,7 +8,7 @@ export default async function handler(req, res) {
 
     const msg = {
       to, // E-mail do usuário
-      from: 'seu-email@dominio.com', // Seu e-mail registrado no SendGrid
+      from: 'bruno.saantunes1@gmail.com', // Use o e-mail verificado no SendGrid
       subject, // Assunto do e-mail
       text,    // Corpo do e-mail em texto simples
       html,    // Corpo do e-mail em formato HTML
