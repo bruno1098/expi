@@ -517,9 +517,7 @@ export function Chat() {
     setModalLoading(false); // Garantir que o carregamento seja redefinido ao fechar
   };
 
-  const [selectedTab, setSelectedTab] = useState("history");
-
-
+ 
   // Função para adicionar mensagens de voz
 
   const addVoiceMessage = (message: VoiceMessage) => {
@@ -539,52 +537,57 @@ export function Chat() {
     }
   }, [voiceMessages, messageEndRef]);
 
+// Tutorial states
+const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+const [tutorialType, setTutorialType] = useState<string | null>(null);
 
-  // Tutorial states
-  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-  const [tutorialType, setTutorialType] = useState<string | null>(null);
+// Definir o tipo Tab como a união das strings
+type Tab = 'voicechat' | 'gptvoice' | 'history' | 'modoescu';
 
-  type Tab = 'voicechat' | 'gptvoice' | 'history' | 'modoescu';
+// Estado para controlar se os tutoriais de cada aba já foram exibidos
+const [tutorialShown, setTutorialShown] = useState<Record<Tab, boolean>>({
+  voicechat: false,
+  gptvoice: false,
+  history: false,
+  modoescu: false
+});
 
-  // Estados para controlar se os tutoriais de cada aba já foram exibidos
-  const [tutorialShown, setTutorialShown] = useState({
-    voicechat: false,
-    gptvoice: false,
-    history: false,
-    modoescu: false
-  });
+// Definir o selectedTab como sendo do tipo Tab
+const [selectedTab, setSelectedTab] = useState<Tab>('history');
+// Definir o selectedTab explicitamente como sendo do tipo Tab
 
-  // UseEffect para abrir o tutorial quando a aba mudar, se ainda não foi mostrado
-  useEffect(() => {
-    if (!tutorialShown[selectedTab]) {
-      switch (selectedTab) {
-        case 'voicechat':
-          setIsTutorialOpen(true);
-          setTutorialType('voicechat');
-          setTutorialShown((prev) => ({ ...prev, voicechat: true })); // Marca o tutorial como exibido
-          break;
-        case 'gptvoice':
-          setIsTutorialOpen(true);
-          setTutorialType('gptvoice');
-          setTutorialShown((prev) => ({ ...prev, gptvoice: true }));
-          break;
-        case 'history':
-          setIsTutorialOpen(true);
-          setTutorialType('history');
-          setTutorialShown((prev) => ({ ...prev, history: true }));
-          break;
-        case 'modoescu':
-          setIsTutorialOpen(true);
-          setTutorialType('modoescu');
-          setTutorialShown((prev) => ({ ...prev, modoescu: true }));
-          break;
-        default:
-          setIsTutorialOpen(false);
-          setTutorialType(null);
-          break;
-      }
+// UseEffect para abrir o tutorial quando a aba mudar, se ainda não foi mostrado
+useEffect(() => {
+  if (!tutorialShown[selectedTab]) {
+    switch (selectedTab) {
+      case 'voicechat':
+        setIsTutorialOpen(true);
+        setTutorialType('voicechat');
+        setTutorialShown((prev) => ({ ...prev, voicechat: true })); // Marca o tutorial como exibido
+        break;
+      case 'gptvoice':
+        setIsTutorialOpen(true);
+        setTutorialType('gptvoice');
+        setTutorialShown((prev) => ({ ...prev, gptvoice: true }));
+        break;
+      case 'history':
+        setIsTutorialOpen(true);
+        setTutorialType('history');
+        setTutorialShown((prev) => ({ ...prev, history: true }));
+        break;
+      case 'modoescu':
+        setIsTutorialOpen(true);
+        setTutorialType('modoescu');
+        setTutorialShown((prev) => ({ ...prev, modoescu: true }));
+        break;
+      default:
+        setIsTutorialOpen(false);
+        setTutorialType(null);
+        break;
     }
-  }, [selectedTab, tutorialShown]); // Dispara quando selectedTab ou tutorialShown mudam
+  }
+}, [selectedTab, tutorialShown]); // Dispara quando selectedTab ou tutorialShown mudam
+
 
 
   const handleSaveUserEmail = async () => {
@@ -665,7 +668,13 @@ export function Chat() {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar com Abas */}
         <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col h-full"> {/* Set h-full */}
-        <Tabs defaultValue="history" className="flex-1 flex flex-col h-full" onValueChange={(value) => setSelectedTab(value)} >
+        <Tabs defaultValue="history" className="flex-1 flex flex-col h-full" onValueChange={(value) => {
+    // Verifica se o valor é um dos permitidos no tipo Tab antes de setá-lo
+    if (["voicechat", "gptvoice", "history", "modoescu"].includes(value)) {
+      setSelectedTab(value as Tab); // Converte para o tipo Tab
+    }
+  }}
+>
           {/* Updated TabsList */}
           <TabsList className="border-b flex overflow-x-auto w-full"> {/* w-full and overflow-x-auto */}
             <TabsTrigger value="history" className="min-w-max text-center px-2 py-2">
