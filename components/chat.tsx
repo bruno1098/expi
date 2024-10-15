@@ -636,7 +636,7 @@ useEffect(() => {
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
           <p className="text-sm">
-            {userName ? `Olá, ${userName}` : "Insira seu nome"}
+            {userName ? `Olá, ${userName}` : "Insira seu e-mail"}
           </p>
         </div>
         <Button onClick={handleNewConversation} variant="ghost" className="p-2 rounded-full">
@@ -938,18 +938,13 @@ useEffect(() => {
                 Finalizar Conversa
               </Button>
               <Modal
-  isOpen={isUserModalOpen}
-  onClose={() => setIsUserModalOpen(false)}
-  title="Insira seu e-mail"
-  isLoading={modalLoading}
->
-  <Input
-    placeholder="Seu e-mail"
-    value={inputEmail}
-    onChange={(e) => setInputEmail(e.target.value)} // Captura o e-mail
-  />
-  <Button onClick={handleSaveUserEmail}>Salvar</Button>
-</Modal>
+                  isOpen={isFeedbackModalOpen}
+                  onClose={handleCloseFeedbackModal}
+                  title={modalTitle}
+                  isLoading={modalLoading}
+                >
+                  <p>{feedbackAnalysis || "Seu feedback foi enviado com sucesso!"}</p>
+                </Modal>
             </div>
           </>
         )}
