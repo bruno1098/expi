@@ -419,11 +419,46 @@ export function Chat() {
       const emailSubject = `EXPI - Feedback da sua conversa com o chatbot`;
       const emailText = `Aqui está o feedback da sua conversa com o chatbot:\n\n${analysis}\n\nConversa:\n${conversationText}`;
       const emailHtml = `
-        <h1>Feedback da sua conversa</h1>
-        <p>${analysis}</p>
-        <h2>Conversa</h2>
-        <pre>${conversationText}</pre>
-      `;
+      <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <table align="center" width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 10px; padding: 20px;">
+          <tr>
+            <td style="text-align: center;">
+              <img src="/logo.png" alt="Logo" width="100" style="margin-bottom: 20px;">
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <h1 style="color: #333333;">Feedback da sua conversa</h1>
+              <p style="color: #555555; font-size: 16px;">Aqui está uma análise detalhada da sua interação recente com o nosso chatbot.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f9f9f9; padding: 15px; border-radius: 5px;">
+              <h2 style="color: #333333;">Análise</h2>
+              <p style="color: #555555; font-size: 16px;">${analysis}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top: 20px;">
+              <h2 style="color: #333333;">Transcrição da Conversa</h2>
+              <pre style="color: #555555; font-size: 14px; background-color: #e9e9e9; padding: 10px; border-radius: 5px; overflow: auto;">${conversationText}</pre>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top: 20px; text-align: center;">
+              <p style="font-size: 14px; color: #777777;">Obrigado por usar nosso serviço!</p>
+              <a href="https://plusoft-expi.vercel.app/" style="background-color: #4CAF50; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block;">Acesse nosso site</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top: 20px; text-align: center; color: #999999; font-size: 12px;">
+              <p>Este e-mail foi enviado automaticamente. Por favor, não responda.</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+    
   
       const userEmail = sessionStorage.getItem("userEmail"); // E-mail do usuário
       await axios.post('/api/sendEmail', {
