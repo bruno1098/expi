@@ -228,32 +228,50 @@ const client = axios.create({
     const promptText = inputValue.trim();
     if (promptText) {
       setLoading(true);
+  
+      // Adicionar a nova mensagem do usuário ao histórico de mensagens
+      const newMessages: Message[] = [
+        ...messages,
+        { role: "user", content: promptText },
+      ];
+  
+      // Mapear as mensagens para o formato esperado pela API do OpenAI
+      const apiMessages = newMessages.map((msg) => ({
+        role: msg.role === "ai" ? "assistant" : msg.role,
+        content: msg.content,
+      }));
+  
       const data = {
         model: "gpt-3.5-turbo",
-        messages: [{ role: "user" as const, content: promptText }],
+        messages: apiMessages,
       };
-
+  
       try {
         const result = await client.post("/chat/completions", data);
         const response = result.data.choices[0].message.content;
-
-        const newMessages: Message[] = [
-          ...messages,
-          { role: "user", content: promptText },
-          { role: "ai", content: "" }
+  
+        // Adicionar a resposta do assistente às mensagens
+        const updatedMessages: Message[] = [
+          ...newMessages,
+          { role: "ai", content: "" },
         ];
-
-        setMessages(newMessages);
+  
+        setMessages(updatedMessages);
         setInputValue("");
         setTimeout(() => handleTypeEffect(response), 1000);
-
-        // Salvar a conversa após a primeira mensagem
-        await saveConversation(newMessages);
+  
+        // Salvar a conversa com a resposta gerada pela IA
+        await saveConversation([
+          ...newMessages,
+          { role: "ai", content: response },
+        ]);
       } catch (error) {
         setLoading(false);
       }
     }
   };
+  
+  
 
   const handleTypeEffect = (response: string) => {
     let index = 0;
