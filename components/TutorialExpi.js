@@ -20,7 +20,7 @@ const Tutorial = ({ onClose }) => {
     },
     {
         target: '.test-button', // Seleciona o botão de finalizar conversa
-        content: 'Agora que vc ja sabe como funciona, faça seu cadastro com seu email aqui.',
+        content: 'Agora que vc ja sabe como funciona, clique no avatar e faça seu cadastro com seu email aqui.',
       },
   ];
 

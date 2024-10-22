@@ -113,13 +113,15 @@ export function Chat() {
   };
 
 
-  const client = axios.create({
-    baseURL: "https://api.openai.com/v1",
-    headers: {
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-  });
+ 
+const client = axios.create({
+  baseURL: "https://api.openai.com/v1",
+  headers: {
+    Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+});
+
 
   useEffect(() => {
     // Carregar o nome do usuário e o ID do sessionStorage
@@ -205,7 +207,7 @@ export function Chat() {
 
     try {
       const response = await client.post("/chat/completions", {
-        model: "gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [
           { role: "system", content: "Você é um assistente útil que gera títulos descritivos e concisos para conversas." },
           { role: "user", content: prompt }
@@ -227,7 +229,7 @@ export function Chat() {
     if (promptText) {
       setLoading(true);
       const data = {
-        model: "gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [{ role: "user" as const, content: promptText }],
       };
 
@@ -399,78 +401,362 @@ export function Chat() {
       Faça uma análise de sentimento vendo se o chatbot se saiu bem, indicando se o usuário ficou satisfeito com as respostas recebidas, 
       se suas expectativas foram atendidas, qual o sentimento geral da interação, e se o chatbot foi eficiente.
       Como um adendo, diga o que pode ser melhorado nesse chatbot.
+
+      mantenha sempre um padrão com os seguintes tópicos:
+      Satisfação do Usuário:
+      Expectativas Atendidas:
+      Sentimento Geral: 
+      Melhoria:
+      
+      deixe essa analise em formato HTML.
+      Use as tags <strong> para destacar as partes importantes, e <p> para separar parágrafos e outras tags necessarias, deixe os titulos maiores para mais destaque.
+
+      remova no começo o conteudo "html" do começo com os 3 pontinhos antes e depois, nao esqueça disso
+
+      seja bem direto e tente usar no maximo 100 palavras
+
   
       Conversa:
       ${conversationText}
     `;
   
     try {
+      // Análise de sentimento
       const response = await client.post("/chat/completions", {
-        model: "gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [
           { role: "system", content: "Você é um assistente útil que analisa feedbacks de conversas." },
           { role: "user", content: prompt }
         ],
-        max_tokens: 150,
-        temperature: 0.7,
+        max_tokens: 130,
+        temperature: 0.5,
       });
   
       const analysis = response.data.choices[0].message.content.trim();
-      const emailSubject = `EXPI - Feedback da sua conversa com o chatbot`;
-      const emailText = `Aqui está o feedback da sua conversa com o chatbot:\n\n${analysis}\n\nConversa:\n${conversationText}`;
-      const emailHtml = `
-      <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-        <table align="center" width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 10px; padding: 20px;">
-          <tr>
-            <td style="text-align: center;">
-              <img src="/logo.png" alt="Logo" width="100" style="margin-bottom: 20px;">
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <h1 style="color: #333333;">Feedback da sua conversa</h1>
-              <p style="color: #555555; font-size: 16px;">Aqui está uma análise detalhada da sua interação recente com o nosso chatbot.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f9f9f9; padding: 15px; border-radius: 5px;">
-              <h2 style="color: #333333;">Análise</h2>
-              <p style="color: #555555; font-size: 16px;">${analysis}</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top: 20px;">
-              <h2 style="color: #333333;">Transcrição da Conversa</h2>
-              <pre style="color: #555555; font-size: 14px; background-color: #e9e9e9; padding: 10px; border-radius: 5px; overflow: auto;">${conversationText}</pre>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top: 20px; text-align: center;">
-              <p style="font-size: 14px; color: #777777;">Obrigado por usar nosso serviço!</p>
-              <a href="https://plusoft-expi.vercel.app/" style="background-color: #4CAF50; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block;">Acesse nosso site</a>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top: 20px; text-align: center; color: #999999; font-size: 12px;">
-              <p>Este e-mail foi enviado automaticamente. Por favor, não responda.</p>
-            </td>
-          </tr>
-        </table>
-      </div>
-    `;
-    
+      const emailSubject = `EXPI - Feedback da sua conversa: ${currentTitle}`;
   
-      const userEmail = sessionStorage.getItem("userEmail"); // E-mail do usuário
+      const emailHtml = `
+<!DOCTYPE html>
+<html dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta content="telephone=no" name="format-detection">
+    <title>Feedback da sua Conversa</title>
+    <!--[if (mso 16)]>
+    <style type="text/css">
+    a {text-decoration: none;}
+    </style>
+    <![endif]-->
+    <!--[if gte mso 9]><style>sup { font-size: 100% !important; }</style><![endif]-->
+    <!--[if gte mso 9]>
+<noscript>
+         <xml>
+           <o:OfficeDocumentSettings>
+           <o:AllowPNG></o:AllowPNG>
+           <o:PixelsPerInch>96</o:PixelsPerInch>
+           </o:OfficeDocumentSettings>
+         </xml>
+      </noscript>
+<![endif]-->
+    <!--[if !mso]><!-- -->
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
+    <!--<![endif]-->
+    <style>
+        body, p, h1, h2, h3, h4, h5, h6, pre {
+            font-family: 'Manrope', sans-serif;
+            color: #ffffff !important; /* Texto sempre em branco */
+        }
+        a {
+            text-decoration: none;
+            color: #ffffff !important; /* Links em branco */
+        }
+        pre {
+            background-color: #3b3b3b;
+            padding: 15px;
+            border-radius: 5px;
+            color: #cccccc;
+            overflow-x: auto;
+        }
+        .es-wrapper {
+            background-color: #314B70;
+        }
+        .es-content-body {
+            background-color: transparent;
+        }
+        h1 {
+            font-size: 40px !important; /* Aumenta o tamanho do título principal */
+            line-height: 1.2;
+        }
+        h2 {
+            font-size: 28px !important; /* Aumenta o tamanho dos subtítulos */
+            line-height: 1.3;
+        }
+        p {
+            font-size: 16px !important; /* Aumenta o tamanho do texto */
+            line-height: 1.5;
+        }
+        .es-header-logo img {
+            display: block;
+            margin: 0 auto;
+        }
+        .es-content-body {
+            padding-top: 50px; /* Ajusta o padding superior para posicionar melhor o conteúdo */
+        }
+        .es-header {
+            padding-top: 30px; /* Ajusta o padding superior do cabeçalho */
+        }
+    </style>
+</head>
+
+<body>
+    <div dir="ltr" class="es-wrapper-color">
+        <!--[if gte mso 9]>
+            <v:background xmlns:v="urn:schemas-microsoft-com:vml" fill="t">
+                <v:fill type="tile" color="#314B70"></v:fill>
+            </v:background>
+        <![endif]-->
+        <table class="es-wrapper" width="100%" cellspacing="0" cellpadding="0" background="https://expi-five.vercel.app/background.png" style="background-image: url('https://expi-five.vercel.app/background.png'); background-repeat: no-repeat; background-position: center top;">
+ <tbody>
+                <tr>
+                    <td class="esd-email-paddings" valign="top">
+                        <!-- Cabeçalho -->
+                        <table cellpadding="0" cellspacing="0" class="es-header esd-header-popover" align="center">
+                            <tbody>
+                                <tr>
+                                    <td class="esd-stripe" align="center">
+                                        <table bgcolor="transparent" class="es-header-body" align="center" cellpadding="0" cellspacing="0" width="600" style="background-color: transparent;">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="es-p20t es-p20r es-p20l esd-structure" align="left">
+                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td width="560" class="esd-container-frame" align="center" valign="top">
+                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                            <tbody>
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-image es-header-logo" style="font-size: 0px;">
+                                                                                        <a target="_blank" href="https://plusoft-expi.vercel.app">
+                                                                                            <img src="https://github.com/bruno1098/expi/blob/main/public/logo.png?raw=true" alt="Logo" style="display: block;" height="80" title="Logo">
+                                                                                        </a>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Espaçamento adicional para centralizar o header -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-spacer" height="20"></td>
+                                                                                </tr>
+                                                                                <!-- Emojis ou imagens adicionais -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-image es-p15b" style="font-size: 0px;">
+                                                                                        <a target="_blank" href="#">
+                                                                                            <img src="https://tlr.stripocdn.email/content/guids/CABINET_dd9759b09de82ede623cff0b42f718ca19c0a4f85f6337f81c705fd693708d47/images/bluebubblelikebuttoniconthumbsuplikesignfeedbackconceptwhitebackground3drendering.png" alt="" style="display: block;" width="60">
+                                                                                        </a>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Título principal -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p25b" style="letter-spacing: 5px">
+                                                                                        <p style="font-size: 14px;">FEEDBACK DA SUA CONVERSA</p>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p40b">
+                                                                                        <h1>Sua Opinião Importa para Nós</h1>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Conteúdo principal -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p40b es-p40r es-p40l es-m-p0r es-m-p0l">
+                                                                                        <p><strong>Título da Conversa:</strong></p>
+                                                                                        <h2>${currentTitle}</h2> <!-- Título da conversa aumentado -->
+                                                                                        <p><strong>Análise da interação:</strong></p>
+                                                                                        ${analysis}
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Transcrição da Conversa -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p20t es-p30b es-p15r es-p15l es-m-p0r es-m-p0l">
+                                                                                        <h2>Transcrição da Conversa:</h2>
+                                                                                        <pre>${conversationText}</pre>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Seção "Tem alguma pergunta?" após a transcrição -->
+                                                                                <tr>
+                                                                                    <td class="esd-structure es-p30t es-p30b es-p20r es-p20l esdev-adapt-off" align="left" background="https://tlr.stripocdn.email/content/guids/CABINET_beef27fd72bf04f5ec347afb3c9242a7a6cb9763af3e70ce8481235882b7a5b6/images/rectangle_5445.png" style="background-image: url('https://tlr.stripocdn.email/content/guids/CABINET_beef27fd72bf04f5ec347afb3c9242a7a6cb9763af3e70ce8481235882b7a5b6/images/rectangle_5445.png'); background-repeat: no-repeat; background-position: center center;">
+                                                                                        <table width="560" cellpadding="0" cellspacing="0" class="esdev-mso-table">
+                                                                                            <tbody>
+                                                                                                <tr>
+                                                                                                    <td class="esdev-mso-td" valign="top">
+                                                                                                        <table cellpadding="0" cellspacing="0" class="es-left" align="left">
+                                                                                                            <tbody>
+                                                                                                                <tr>
+                                                                                                                    <td width="223" class="esd-container-frame" align="left">
+                                                                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                                                                            <tbody>
+                                                                                                                                <tr>
+                                                                                                                                    <td align="right" class="esd-block-image" style="font-size: 0px;">
+                                                                                                                                        <a target="_blank" href="#">
+                                                                                                                                            <img class="adapt-img" src="https://tlr.stripocdn.email/content/guids/CABINET_beef27fd72bf04f5ec347afb3c9242a7a6cb9763af3e70ce8481235882b7a5b6/images/32226255_m001t0311_a_message_01sep22.png" alt="" style="display: block;" width="100">
+                                                                                                                                        </a>
+                                                                                                                                    </td>
+                                                                                                                                </tr>
+                                                                                                                            </tbody>
+                                                                                                                        </table>
+                                                                                                                    </td>
+                                                                                                                </tr>
+                                                                                                            </tbody>
+                                                                                                        </table>
+                                                                                                    </td>
+                                                                                                    <td width="20"></td>
+                                                                                                    <td class="esdev-mso-td" valign="top">
+                                                                                                        <table cellpadding="0" cellspacing="0" class="es-right" align="right">
+                                                                                                            <tbody>
+                                                                                                                <tr>
+                                                                                                                    <td width="317" align="left" class="esd-container-frame">
+                                                                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                                                                            <tbody>
+                                                                                                                                <tr>
+                                                                                                                                    <td align="left" class="esd-block-text es-p20t es-p20b">
+                                                                                                                                        <p>Tem alguma pergunta?<br><a target="_blank" href="https://plusoft-expi.vercel.app">Entre em contato com nossa equipe</a></p>
+                                                                                                                                    </td>
+                                                                                                                                </tr>
+                                                                                                                            </tbody>
+                                                                                                                        </table>
+                                                                                                                    </td>
+                                                                                                                </tr>
+                                                                                                            </tbody>
+                                                                                                        </table>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Espaçamento adicional -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-spacer" height="20"></td>
+                                                                                </tr>
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </td>
+                                                                </tr>
+                                                                <!-- Outros conteúdos podem ser adicionados aqui -->
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                                <!-- Rodapé -->
+                                                <tr>
+                                                    <td class="esd-structure es-p40t es-p40b es-p20r es-p20l" align="left" background="https://expi-five.vercel.app/background.png" style="background-image: url('https://expi-five.vercel.app/background.png'); background-repeat: no-repeat; background-position: center bottom;">
+                                                          <table cellpadding="0" cellspacing="0" width="100%">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td width="560" align="left" class="esd-container-frame">
+                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                            <tbody>
+                                                                                <!-- Ícones de redes sociais -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-social" style="font-size:0">
+                                                                                        <table cellpadding="0" cellspacing="0" class="es-table-not-adapt es-social">
+                                                                                            <tbody>
+                                                                                                <tr>
+                                                                                                    <td align="center" valign="top" class="es-p40r">
+                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/facebook-logo-white.png" alt="Fb" title="Facebook" height="24"></a>
+                                                                                                    </td>
+                                                                                                    <td align="center" valign="top" class="es-p40r">
+                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/x-logo-white.png" alt="Tw" title="Twitter" height="24"></a>
+                                                                                                    </td>
+                                                                                                    <td align="center" valign="top" class="es-p40r">
+                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/instagram-logo-white.png" alt="Ig" title="Instagram" height="24"></a>
+                                                                                                    </td>
+                                                                                                    <td align="center" valign="top">
+                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/youtube-logo-white.png" alt="Yt" title="Youtube" height="24"></a>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Linha separadora -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-spacer es-p20" style="font-size:0">
+                                                                                        <table border="0" width="65%" height="100%" cellpadding="0" cellspacing="0">
+                                                                                            <tbody>
+                                                                                                <tr>
+                                                                                                    <td style="border-bottom: 1px solid #ffffff; background: unset; height: 1px; width: 100%; margin: 0px;"></td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Texto de agradecimento -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p15t es-p40b">
+                                                                                        <p>Obrigado por usar nosso serviço!</p>
+                                                                                        <p>Este e-mail foi enviado automaticamente, por favor, não responda.</p>
+                                                                                        <p>Visite nosso site: <a href="https://plusoft-expi.vercel.app" target="_blank">https://plusoft-expi.vercel.app</a></p>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Logo adicional no rodapé, se desejar -->
+                                                                                <!--
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-image es-infoblock made_with" style="font-size:0">
+                                                                                        <a target="_blank" href="#">
+                                                                                            <img src="https://link-para-sua-logo.png" alt="" width="125" style="display: block;">
+                                                                                        </a>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                -->
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                                <!-- Fim do Rodapé -->
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <!-- Fim do conteúdo principal -->
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>
+`;
+
+
+
+  
+      // Enviar e-mail com a análise
       await axios.post('/api/sendEmail', {
-        to: userEmail,
+        to: sessionStorage.getItem("userEmail"),
         subject: emailSubject,
-        text: emailText,
-        html: emailHtml
+        text: `Aqui está o feedback da sua conversa:
+  
+  Título da Conversa: ${currentTitle}
+  
+  Análise:
+  ${analysis}
+  
+  Conversa:
+  ${conversationText}`,
+        html: emailHtml,
       });
   
-      setModalLoading(false);
-  
-      // Continua com a análise de feedback
+      // Categorizar o feedback
       const categorizationPrompt = `
         Dado o seguinte feedback:
   
@@ -480,7 +766,7 @@ export function Chat() {
         categorize essa conversa como "Bom", "Ruim", "Neutro", "Insatisfeito" 
         apenas com uma única dessas palavras E MAIS NENHUMA OUTRA. Analise e use sentimentos para categorizar de forma mais assertiva possível.
       `;
-  
+      
       const categorizationResponse = await client.post("/chat/completions", {
         model: "gpt-4o",
         messages: [
@@ -516,21 +802,21 @@ export function Chat() {
       // Preparar o feedback para salvar via API
       const feedbackData = {
         id: feedbackId,
-        usuario: userEmail,
+        usuario: sessionStorage.getItem("userEmail"),
         comentario: analysis,
         rating: categoryResult,
         data: new Date().toISOString(),
       };
   
       // Enviar o feedback completo para a API
-      const apiResponse = await axios.post("/api/feedback", feedbackData, {
+      await axios.post("/api/feedback", feedbackData, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
   
-      console.log("Feedback enviado com sucesso:", apiResponse.data);
-  
+      console.log("Feedback enviado com sucesso!");
+      
       // Desativar o estado de carregamento
       setModalLoading(false);
   
@@ -541,6 +827,7 @@ export function Chat() {
       setModalLoading(false);
     }
   };
+  
   
 
   const handleCloseFeedbackModal = () => {
