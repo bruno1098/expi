@@ -234,12 +234,20 @@ const client = axios.create({
         ...messages,
         { role: "user", content: promptText },
       ];
-  
+
+      const systemMessage = {
+        role: "system",
+        content: "Você é um atendente virtual de uma loja online chamada 'Loja expi'. Sua função é ajudar os clientes com informações sobre produtos, preços, disponibilidade, pedidos, entregas e políticas da loja. Seja sempre educado, profissional e prestativo."
+      };
+
       // Mapear as mensagens para o formato esperado pela API do OpenAI
-      const apiMessages = newMessages.map((msg) => ({
-        role: msg.role === "ai" ? "assistant" : msg.role,
-        content: msg.content,
-      }));
+      const apiMessages = [
+        systemMessage,
+        ...newMessages.map((msg) => ({
+          role: msg.role === "ai" ? "assistant" : msg.role,
+          content: msg.content,
+        })),
+      ];
   
       const data = {
         model: "gpt-3.5-turbo",
