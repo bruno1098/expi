@@ -223,7 +223,6 @@ const client = axios.create({
     }
   };
 
-
   const handleSubmit = async () => {
     const promptText = inputValue.trim();
     if (promptText) {
@@ -234,20 +233,12 @@ const client = axios.create({
         ...messages,
         { role: "user", content: promptText },
       ];
-
-      const systemMessage = {
-        role: "system",
-        content: "Você é um atendente virtual de uma loja online chamada 'Loja expi'. Sua função é ajudar os clientes com informações sobre produtos, preços, disponibilidade, pedidos, entregas e políticas da loja. Seja sempre educado, profissional e prestativo."
-      };
-
+  
       // Mapear as mensagens para o formato esperado pela API do OpenAI
-      const apiMessages = [
-        systemMessage,
-        ...newMessages.map((msg) => ({
-          role: msg.role === "ai" ? "assistant" : msg.role,
-          content: msg.content,
-        })),
-      ];
+      const apiMessages = newMessages.map((msg) => ({
+        role: msg.role === "ai" ? "assistant" : msg.role,
+        content: msg.content,
+      }));
   
       const data = {
         model: "gpt-3.5-turbo",
@@ -278,6 +269,61 @@ const client = axios.create({
       }
     }
   };
+  
+  // const handleSubmit = async () => {
+  //   const promptText = inputValue.trim();
+  //   if (promptText) {
+  //     setLoading(true);
+  
+  //     // Adicionar a nova mensagem do usuário ao histórico de mensagens
+  //     const newMessages: Message[] = [
+  //       ...messages,
+  //       { role: "user", content: promptText },
+  //     ];
+
+  //     const systemMessage = {
+  //       role: "system",
+  //       content: "Você é um atendente virtual de uma loja online chamada 'Loja expi'. Sua função é ajudar os clientes com informações sobre produtos, preços, disponibilidade, pedidos, entregas e políticas da loja. Seja sempre educado, profissional e prestativo."
+  //     };
+
+  //     // Mapear as mensagens para o formato esperado pela API do OpenAI
+  //     const apiMessages = [
+  //       systemMessage,
+  //       ...newMessages.map((msg) => ({
+  //         role: msg.role === "ai" ? "assistant" : msg.role,
+  //         content: msg.content,
+  //       })),
+  //     ];
+  
+  //     const data = {
+  //       model: "gpt-3.5-turbo",
+  //       messages: apiMessages,
+  //     };
+  
+  //     try {
+  //       const result = await client.post("/chat/completions", data);
+  //       const response = result.data.choices[0].message.content;
+  
+  //       // Adicionar a resposta do assistente às mensagens
+  //       const updatedMessages: Message[] = [
+  //         ...newMessages,
+  //         { role: "ai", content: "" },
+  //       ];
+  
+  //       setMessages(updatedMessages);
+  //       setInputValue("");
+  //       setTimeout(() => handleTypeEffect(response), 1000);
+  
+  //       // Salvar a conversa com a resposta gerada pela IA
+  //       await saveConversation([
+  //         ...newMessages,
+  //         { role: "ai", content: response },
+  //       ]);
+  //     } catch (error) {
+  //       setLoading(false);
+  //     }
+  //   }
+  // };
   
   
 
@@ -407,7 +453,7 @@ const client = axios.create({
   };
 
   const handleOpenFeedbackModal = async () => {
-    if (messages.length === 0) {
+    if (messages.length === 0) { 
       setErrorMessage("A conversa deve ter pelo menos uma mensagem antes de ser finalizada.");
       setIsErrorModalOpen(true);
       return;
@@ -454,7 +500,7 @@ const client = axios.create({
           { role: "system", content: "Você é um assistente útil que analisa feedbacks de conversas." },
           { role: "user", content: prompt }
         ],
-        max_tokens: 130,
+        max_tokens: 180,
         temperature: 0.5,
       });
   
@@ -933,23 +979,56 @@ useEffect(() => {
 }, [selectedTab, tutorialShown]); // Dispara quando selectedTab ou tutorialShown mudam
 
 
+const [emailError, setEmailError] = useState('');
+
+  const verifyEmail = async (email: string) => {
+    const apiKey = process.env.NEXT_PUBLIC_ABSTRACT_API_KEY; // Adicione sua chave API ao .env.local
+    const url = `https://emailvalidation.abstractapi.com/v1/?api_key=${apiKey}&email=${email}`;
+
+    try {
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao verificar e-mail:', error);
+      return null;
+    }
+  };
 
   const handleSaveUserEmail = async () => {
+    setEmailError('');
     if (inputEmail.trim() === "") {
-      alert("Por favor, insira um e-mail válido.");
+      setEmailError("Por favor, insira um e-mail válido.");
       return;
     }
-  
+
     try {
+      const result = await verifyEmail(inputEmail);
+      
+      if (!result) {
+        setEmailError("Não foi possível verificar o e-mail. Tente novamente mais tarde.");
+        return;
+      }
+
+      if (result.deliverability === "UNDELIVERABLE") {
+        setEmailError("Este e-mail parece não ser válido ou não existe.");
+        return;
+      }
+
+      if (result.is_disposable_email.value) {
+        setEmailError("Por favor, use um e-mail não descartável.");
+        return;
+      }
+
+      // Se chegou até aqui, o e-mail é considerado válido
       const newUserId = await getNextUserId();
-      // Salva o e-mail no sessionStorage e Firebase
       sessionStorage.setItem("userEmail", inputEmail);
       sessionStorage.setItem("userId", newUserId);
-      setUserName(inputEmail); // Usa o e-mail como identificador do usuário
+      setUserName(inputEmail);
       setUserId(newUserId);
       setIsUserModalOpen(false);
     } catch (error) {
       console.error("Erro ao salvar o e-mail:", error);
+      setEmailError("Ocorreu um erro ao verificar o e-mail. Tente novamente.");
     }
   };
   
@@ -994,19 +1073,20 @@ useEffect(() => {
 
       {/* Reutilizando o Modal para o usuário inserir o nome */}
       {isUserModalOpen && (
-       <Modal
-       isOpen={isUserModalOpen}
-       onClose={() => setIsUserModalOpen(false)}
-       title="Insira seu e-mail"
-       isLoading={modalLoading}
-     >
-       <Input
-         placeholder="Seu e-mail"
-         value={inputEmail}
-         onChange={(e) => setInputEmail(e.target.value)} // Captura o e-mail
-       />
-       <Button onClick={handleSaveUserEmail}>Salvar</Button>
-     </Modal>
+      <Modal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        title="Insira seu e-mail"
+        isLoading={modalLoading}
+      >
+        <Input
+          placeholder="Seu e-mail"
+          value={inputEmail}
+          onChange={(e) => setInputEmail(e.target.value)}
+        />
+        {emailError && <p className="text-red-500 mt-2">{emailError}</p>}
+        <Button onClick={handleSaveUserEmail}>Salvar</Button>
+      </Modal>
       )}
 
       <div className="flex flex-1 overflow-hidden">
