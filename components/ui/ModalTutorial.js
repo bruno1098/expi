@@ -5,7 +5,7 @@ const ModalTutorial = ({ isOpen, onClose, content, onNext, onPrev, step, totalSt
   if (!isOpen) return null;
 
   // Condicional para mudar a posição do modal no passo desejado (por exemplo, passo 2)
-  const isBottomStep = step === 3; // Ajuste o número do passo conforme necessário
+  const isBottomStep = step === 4; // Ajuste o número do passo conforme necessário
 
   // Se for o passo que queremos colocar o modal na parte de baixo, ajustamos a posição
   const modalPosition = isBottomStep
@@ -30,16 +30,18 @@ const ModalTutorial = ({ isOpen, onClose, content, onNext, onPrev, step, totalSt
         className="modal-tutorial"
         style={{
           position: 'absolute',
+          
           ...modalPosition, // Usa a posição baseada na condicional
           width: '300px',
           padding: '20px',
-          backgroundColor: '#f9f9f9', // Fundo claro e moderno
-          border: '2px solid #e0e0e0',
+          backgroundColor: '#1a1a2e', // Fundo claro e moderno
+          border: '1px solid #e0e0e0',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)', // Sombra suave
           zIndex: 10001,
           borderRadius: '12px',
           overflow: 'hidden', // Garante que o conteúdo não seja cortado
           fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif', // Tipografia moderna
+          color: '#999',
         }}
       >
         {/* Botão de Fechar (X) */}
@@ -60,7 +62,7 @@ const ModalTutorial = ({ isOpen, onClose, content, onNext, onPrev, step, totalSt
           &times;
         </button>
 
-        <div style={{ marginBottom: '10px', fontSize: '16px', color: '#333' }}>
+        <div style={{ marginBottom: '10px', fontSize: '16px', color: '#ffffff' }}>
           <p>{content}</p>
         </div>
 
@@ -76,9 +78,9 @@ const ModalTutorial = ({ isOpen, onClose, content, onNext, onPrev, step, totalSt
           <div style={{
             height: '6px',
             width: `${((step + 1) / totalSteps) * 100}%`,
-            backgroundColor: '#007bff',
+            backgroundColor: '#7b2cbf',
             borderRadius: '3px',
-            transition: 'width 0.3s',
+            transition: 'width 0.4s',
           }}></div>
         </div>
 

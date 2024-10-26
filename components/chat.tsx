@@ -20,6 +20,16 @@ import { SettingsIcon, MoreHorizontalIcon } from "lucide-react";
 import Canais from "./canais";
 import { ref, set } from "firebase/database";
 import GptChat from "./gpt";
+import { FaRegSmile, FaRegMeh, FaRegFrown, FaRegLaughBeam, FaRegSadTear } from 'react-icons/fa';
+
+import { FiSend, FiMessageSquare, FiUser } from "react-icons/fi";
+
+import { useTypewriter as useTypewriterEffect } from 'react-simple-typewriter';
+
+import Sentiment from "sentiment";
+import { AnimatePresence, motion, useAnimation } from "framer-motion";
+import { Smiley, SmileyMeh, SmileySad, SmileyWink, SmileyXEyes } from "phosphor-react";
+
 
 
 type Message = {
@@ -77,6 +87,45 @@ export function Chat() {
   const [userId, setUserId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const [isTyping, setIsTyping] = useState(false);
+  const [wordCloudData, setWordCloudData] = useState<{ text: string; value: number }[]>([]);
+  const [currentSentiment, setCurrentSentiment] = useState<number | null>(null);
+
+  const [typewriterText] = useTypewriterEffect({
+    words: ['Digitando...'],
+    loop: 0,
+    typeSpeed: 70,
+  });
+  const sentimentAnalyzer = new Sentiment();
+  
+  
+  const updateWordCloud = (text: string) => {
+    const words = text.toLowerCase().split(/\s+/);
+    const wordCount: { [key: string]: number } = {};
+    words.forEach(word => {
+      if (word.length > 3) {
+        wordCount[word] = (wordCount[word] || 0) + 1;
+      }
+    });
+    const newCloudData = Object.entries(wordCount).map(([text, value]) => ({ text, value }));
+    setWordCloudData(prevData => {
+      const combinedData = [...prevData, ...newCloudData];
+      const mergedData = combinedData.reduce((acc, curr) => {
+        const existing = acc.find(item => item.text === curr.text);
+        if (existing) {
+          existing.value += curr.value;
+        } else {
+          acc.push(curr);
+        }
+        return acc;
+      }, [] as { text: string; value: number }[]);
+      return mergedData.sort((a, b) => b.value - a.value).slice(0, 7); // Limita a 7 palavras mais frequentes
+    });
+  };
+
+  
+
   // Carregar o nome e o tema salvos no localStorage na inicialização
   useEffect(() => {
     // Verifica se há uma preferência de tema salva no localStorage
@@ -113,6 +162,7 @@ export function Chat() {
   };
 
 
+ 
   const client = axios.create({
     baseURL: "https://api.openai.com/v1",
     headers: {
@@ -120,6 +170,7 @@ export function Chat() {
       'Content-Type': 'application/json',
     },
   });
+
 
   useEffect(() => {
     // Carregar o nome do usuário e o ID do sessionStorage
@@ -205,7 +256,7 @@ export function Chat() {
 
     try {
       const response = await client.post("/chat/completions", {
-        model: "gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [
           { role: "system", content: "Você é um assistente útil que gera títulos descritivos e concisos para conversas." },
           { role: "user", content: prompt }
@@ -221,63 +272,243 @@ export function Chat() {
     }
   };
 
+   const controls = useAnimation();
+
+
+   const analyzeSentimentGPT = async (messages: Message[]): Promise<number> => {
+    const conversationText = messages.map(msg => msg.content).join('\n');
+    const prompt = `
+      Analise o sentimento geral da seguinte conversa e classifique-o em uma escala de -1 a 1, 
+      onde -1 é muito negativo, 0 é neutro e 1 é muito positivo. Retorne **apenas** o número, sem nenhum outro texto.
+  
+      Conversa:
+      ${conversationText}
+  
+      Sentimento:
+    `;
+  
+    try {
+      const response = await client.post("/chat/completions", {
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: "Você é um analisador de sentimentos preciso." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 5, // Aumentado de 1 para 5
+        temperature: 0.3,
+      });
+  
+      const sentimentText = response.data.choices[0].message.content.trim();
+      console.log("Resposta do GPT para Sentimento:", sentimentText); // Adicionado para depuração
+  
+      // Extraia o número usando regex para capturar possíveis formatos como -0.5, 0, 0.3, etc.
+      const sentimentMatch = sentimentText.match(/-?\d+(\.\d+)?/);
+      const sentiment = sentimentMatch ? parseFloat(sentimentMatch[0]) : 0;
+  
+      return isNaN(sentiment) ? 0 : sentiment;
+    } catch (error) {
+      console.error("Erro ao analisar sentimento:", error);
+      return 0;
+    }
+  };
+  
+
+
+  
+  
+  
+
+
+  const handleTypeEffect = async (response: string) => {
+    const words = response.split(' ');
+    for (let i = 0; i < words.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 50)); // Ajuste este valor para controlar a velocidade
+      setMessages(currentMessages => {
+        const newMessages = [...currentMessages];
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage && lastMessage.role === "ai") {
+          lastMessage.content = words.slice(0, i + 1).join(' ');
+        }
+        return newMessages;
+      });
+    }
+    setLoading(false);
+    await saveConversation([...messages, { role: "ai", content: response }]);
+  };
+  const TypingIndicator = () => (
+    <motion.div
+      className="flex items-center space-x-2 text-gray-400"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.span
+        className="w-2 h-2 bg-gray-400 rounded-full"
+        animate={{ y: [0, -5, 0] }}
+        transition={{ duration: 0.5, repeat: Infinity, repeatType: "loop" }}
+      />
+      <motion.span
+        className="w-2 h-2 bg-gray-400 rounded-full"
+        animate={{ y: [0, -5, 0] }}
+        transition={{ duration: 0.5, repeat: Infinity, repeatType: "loop", delay: 0.1 }}
+      />
+      <motion.span
+        className="w-2 h-2 bg-gray-400 rounded-full"
+        animate={{ y: [0, -5, 0] }}
+        transition={{ duration: 0.5, repeat: Infinity, repeatType: "loop", delay: 0.2 }}
+      />
+    </motion.div>
+  );
+  const saveConversation = async (newMessages: Message[]) => {
+    let updatedHistory: Conversation[] = history ? [...history] : [];
+
+    if (activeConversationIndex === null) {
+      // Criar uma nova conversa apenas uma vez
+      const title = await generateTitleFromGPT(newMessages);
+      setCurrentTitle(title);
+
+      // Obter o próximo ID único para a nova conversa
+      const newConversationId = await getNextConversationId();
+
+      const newConversation: Conversation = {
+        id: newConversationId,
+        title,
+        messages: newMessages,
+      };
+
+      updatedHistory = [...updatedHistory, newConversation];
+      setHistory(updatedHistory);
+      setActiveConversationIndex(updatedHistory.length - 1);
+
+      // Salvar a nova conversa no Firebase
+      await saveConversationToFirebase(newConversation.id, newConversation);
+    } else {
+      // Atualiza a conversa existente com as novas mensagens
+      const updatedConversation = updatedHistory[activeConversationIndex];
+      updatedConversation.messages = [...updatedConversation.messages, ...newMessages];
+
+      setHistory(updatedHistory);
+
+      const conversationData = {
+        title: updatedConversation.title,
+        messages: updatedConversation.messages,
+      };
+      await saveConversationToFirebase(updatedConversation.id, conversationData);
+    }
+  };
 
   const handleSubmit = async () => {
     const promptText = inputValue.trim();
     if (promptText) {
       setLoading(true);
+      setIsTyping(true);
+
+      const newMessages: Message[] = [
+        ...messages,
+        { role: "user", content: promptText },
+      ];
+      setMessages(newMessages);
+      updateWordCloud(promptText);
+
+      const apiMessages = newMessages.map((msg) => ({
+        role: msg.role === "ai" ? "assistant" as const : msg.role,
+        content: msg.content,
+      }));
+
       const data = {
-        model: "gpt-4o",
-        messages: [{ role: "user" as const, content: promptText }],
+        model: "gpt-3.5-turbo",
+        messages: apiMessages,
       };
 
       try {
         const result = await client.post("/chat/completions", data);
         const response = result.data.choices[0].message.content;
 
-        const newMessages: Message[] = [
-          ...messages,
-          { role: "user", content: promptText },
-          { role: "ai", content: "" }
-        ];
+        setIsTyping(false);
+        
+        // Iniciar a animação de digitação
+        await handleTypeEffect(response);
 
-        setMessages(newMessages);
+        const updatedMessages: Message[] = [...newMessages, { role: "ai", content: response }];
+        setMessages(updatedMessages);
+        updateWordCloud(response);
+
+        // Analisar sentimento após cada mensagem
+        const newSentiment = await analyzeSentimentGPT(updatedMessages);
+        setCurrentSentiment(newSentiment);
+
+        // Animar a barra de sentimento
+        controls.start({ width: `${(newSentiment + 1) * 50}%` });
+
         setInputValue("");
-        setTimeout(() => handleTypeEffect(response), 1000);
-
-        // Salvar a conversa após a primeira mensagem
-        await saveConversation(newMessages);
+        await saveConversation(updatedMessages);
       } catch (error) {
+        console.error("Erro ao processar a mensagem:", error);
+      } finally {
         setLoading(false);
+        setIsTyping(false);
       }
     }
   };
+  
+  // const handleSubmit = async () => {
+  //   const promptText = inputValue.trim();
+  //   if (promptText) {
+  //     setLoading(true);
+  
+  //     // Adicionar a nova mensagem do usuário ao histórico de mensagens
+  //     const newMessages: Message[] = [
+  //       ...messages,
+  //       { role: "user", content: promptText },
+  //     ];
 
-  const handleTypeEffect = (response: string) => {
-    let index = 0;
-    const intervalId = setInterval(() => {
-      setMessages((currentMessages) => {
-        const newMessages = [...currentMessages];
-        const lastMessage = newMessages[newMessages.length - 1];
+  //     const systemMessage = {
+  //       role: "system",
+  //       content: "Você é um atendente virtual de uma loja online chamada 'Loja expi'. Sua função é ajudar os clientes com informações sobre produtos, preços, disponibilidade, pedidos, entregas e políticas da loja. Seja sempre educado, profissional e prestativo."
+  //     };
 
-        if (lastMessage && lastMessage.role === "ai") {
-          lastMessage.content = response.substring(0, index + 1);
-          return [...newMessages];
-        } else {
-          clearInterval(intervalId);
-          return currentMessages;
-        }
-      });
+  //     // Mapear as mensagens para o formato esperado pela API do OpenAI
+  //     const apiMessages = [
+  //       systemMessage,
+  //       ...newMessages.map((msg) => ({
+  //         role: msg.role === "ai" ? "assistant" : msg.role,
+  //         content: msg.content,
+  //       })),
+  //     ];
+  
+  //     const data = {
+  //       model: "gpt-3.5-turbo",
+  //       messages: apiMessages,
+  //     };
+  
+  //     try {
+  //       const result = await client.post("/chat/completions", data);
+  //       const response = result.data.choices[0].message.content;
+  
+  //       // Adicionar a resposta do assistente às mensagens
+  //       const updatedMessages: Message[] = [
+  //         ...newMessages,
+  //         { role: "ai", content: "" },
+  //       ];
+  
+  //       setMessages(updatedMessages);
+  //       setInputValue("");
+  //       setTimeout(() => handleTypeEffect(response), 1000);
+  
+  //       // Salvar a conversa com a resposta gerada pela IA
+  //       await saveConversation([
+  //         ...newMessages,
+  //         { role: "ai", content: response },
+  //       ]);
+  //     } catch (error) {
+  //       setLoading(false);
+  //     }
+  //   }
+  // };
+  
+  
 
-      index++;
-      if (index >= response.length) {
-        clearInterval(intervalId);
-        setLoading(false);
-        // Salva a conversa com a resposta gerada pela IA
-        saveConversation([...messages, { role: "ai", content: response }]);
-      }
-    }, 20);
-  };
+
 
 
   const handleKeyDown = (event: { key: string; shiftKey: any; preventDefault: () => void; }) => {
@@ -340,47 +571,17 @@ export function Chat() {
   };
 
 
-  const saveConversation = async (newMessages: Message[]) => {
-    let updatedHistory: Conversation[] = history ? [...history] : [];
 
-    if (activeConversationIndex === null) {
-      // Criar uma nova conversa apenas uma vez
-      const title = await generateTitleFromGPT(newMessages);
-      setCurrentTitle(title);
-
-      // Obter o próximo ID único para a nova conversa
-      const newConversationId = await getNextConversationId();
-
-      const newConversation: Conversation = {
-        id: newConversationId,
-        title,
-        messages: newMessages,
-      };
-
-      updatedHistory = [...updatedHistory, newConversation];
-      setHistory(updatedHistory);
-      setActiveConversationIndex(updatedHistory.length - 1);
-
-      // Salvar a nova conversa no Firebase
-      await saveConversationToFirebase(newConversation.id, newConversation);
-    } else {
-      // Atualiza a conversa existente com as novas mensagens
-      const updatedConversation = updatedHistory[activeConversationIndex];
-      updatedConversation.messages = [...updatedConversation.messages, ...newMessages];
-
-      setHistory(updatedHistory);
-
-      const conversationData = {
-        title: updatedConversation.title,
-        messages: updatedConversation.messages,
-      };
-      await saveConversationToFirebase(updatedConversation.id, conversationData);
-    }
-  };
 
   const handleOpenFeedbackModal = async () => {
-    if (messages.length === 0) {
+    if (messages.length === 0) { 
       setErrorMessage("A conversa deve ter pelo menos uma mensagem antes de ser finalizada.");
+      setIsErrorModalOpen(true);
+      return;
+    }
+    
+    if (!sessionStorage.getItem("userEmail")) {
+      setErrorMessage("Por favor, insira seu e-mail antes de finalizar a conversa.");
       setIsErrorModalOpen(true);
       return;
     }
@@ -399,43 +600,362 @@ export function Chat() {
       Faça uma análise de sentimento vendo se o chatbot se saiu bem, indicando se o usuário ficou satisfeito com as respostas recebidas, 
       se suas expectativas foram atendidas, qual o sentimento geral da interação, e se o chatbot foi eficiente.
       Como um adendo, diga o que pode ser melhorado nesse chatbot.
+
+      mantenha sempre um padrão com os seguintes tópicos:
+      Satisfação do Usuário:
+      Expectativas Atendidas:
+      Sentimento Geral: 
+      Melhoria:
+      
+      deixe essa analise em formato HTML.
+      Use as tags <strong> para destacar as partes importantes, e <p> para separar parágrafos e outras tags necessarias, deixe os titulos maiores para mais destaque.
+
+      remova no começo o conteudo "html" do começo com os 3 pontinhos antes e depois, nao esqueça disso
+
+      seja bem direto e tente usar no maximo 100 palavras
+
   
       Conversa:
       ${conversationText}
     `;
   
     try {
+      // Análise de sentimento
       const response = await client.post("/chat/completions", {
-        model: "gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [
           { role: "system", content: "Você é um assistente útil que analisa feedbacks de conversas." },
           { role: "user", content: prompt }
         ],
-        max_tokens: 150,
-        temperature: 0.7,
+        max_tokens: 180,
+        temperature: 0.5,
       });
   
       const analysis = response.data.choices[0].message.content.trim();
-      const emailSubject = `EXPI - Feedback da sua conversa com o chatbot`;
-      const emailText = `Aqui está o feedback da sua conversa com o chatbot:\n\n${analysis}\n\nConversa:\n${conversationText}`;
-      const emailHtml = `
-        <h1>Feedback da sua conversa</h1>
-        <p>${analysis}</p>
-        <h2>Conversa</h2>
-        <pre>${conversationText}</pre>
-      `;
+      const emailSubject = `EXPI - Feedback da sua conversa: ${currentTitle}`;
   
-      const userEmail = sessionStorage.getItem("userEmail"); // E-mail do usuário
+      const emailHtml = `
+<!DOCTYPE html>
+<html dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta content="telephone=no" name="format-detection">
+    <title>Feedback da sua Conversa</title>
+    <!--[if (mso 16)]>
+    <style type="text/css">
+    a {text-decoration: none;}
+    </style>
+    <![endif]-->
+    <!--[if gte mso 9]><style>sup { font-size: 100% !important; }</style><![endif]-->
+    <!--[if gte mso 9]>
+<noscript>
+         <xml>
+           <o:OfficeDocumentSettings>
+           <o:AllowPNG></o:AllowPNG>
+           <o:PixelsPerInch>96</o:PixelsPerInch>
+           </o:OfficeDocumentSettings>
+         </xml>
+      </noscript>
+<![endif]-->
+    <!--[if !mso]><!-- -->
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
+    <!--<![endif]-->
+    <style>
+        body, p, h1, h2, h3, h4, h5, h6, pre {
+            font-family: 'Manrope', sans-serif;
+            color: #ffffff !important; /* Texto sempre em branco */
+        }
+        a {
+            text-decoration: none;
+            color: #ffffff !important; /* Links em branco */
+        }
+        pre {
+            background-color: #3b3b3b;
+            padding: 15px;
+            border-radius: 5px;
+            color: #cccccc;
+            overflow-x: auto;
+        }
+        .es-wrapper {
+            background-color: #314B70;
+        }
+        .es-content-body {
+            background-color: transparent;
+        }
+        h1 {
+            font-size: 40px !important; /* Aumenta o tamanho do título principal */
+            line-height: 1.2;
+        }
+        h2 {
+            font-size: 28px !important; /* Aumenta o tamanho dos subtítulos */
+            line-height: 1.3;
+        }
+        p {
+            font-size: 16px !important; /* Aumenta o tamanho do texto */
+            line-height: 1.5;
+        }
+        .es-header-logo img {
+            display: block;
+            margin: 0 auto;
+        }
+        .es-content-body {
+            padding-top: 50px; /* Ajusta o padding superior para posicionar melhor o conteúdo */
+        }
+        .es-header {
+            padding-top: 30px; /* Ajusta o padding superior do cabeçalho */
+        }
+    </style>
+</head>
+
+<body>
+    <div dir="ltr" class="es-wrapper-color">
+        <!--[if gte mso 9]>
+            <v:background xmlns:v="urn:schemas-microsoft-com:vml" fill="t">
+                <v:fill type="tile" color="#314B70"></v:fill>
+            </v:background>
+        <![endif]-->
+        <table class="es-wrapper" width="100%" cellspacing="0" cellpadding="0" background="https://expi-five.vercel.app/background.png" style="background-image: url('https://expi-five.vercel.app/background.png'); background-repeat: no-repeat; background-position: center top;">
+ <tbody>
+                <tr>
+                    <td class="esd-email-paddings" valign="top">
+                        <!-- Cabeçalho -->
+                        <table cellpadding="0" cellspacing="0" class="es-header esd-header-popover" align="center">
+                            <tbody>
+                                <tr>
+                                    <td class="esd-stripe" align="center">
+                                        <table bgcolor="transparent" class="es-header-body" align="center" cellpadding="0" cellspacing="0" width="600" style="background-color: transparent;">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="es-p20t es-p20r es-p20l esd-structure" align="left">
+                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td width="560" class="esd-container-frame" align="center" valign="top">
+                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                            <tbody>
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-image es-header-logo" style="font-size: 0px;">
+                                                                                        <a target="_blank" href="https://plusoft-expi.vercel.app">
+                                                                                            <img src="https://github.com/bruno1098/expi/blob/main/public/logo.png?raw=true" alt="Logo" style="display: block;" height="80" title="Logo">
+                                                                                        </a>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Espaçamento adicional para centralizar o header -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-spacer" height="20"></td>
+                                                                                </tr>
+                                                                                <!-- Emojis ou imagens adicionais -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-image es-p15b" style="font-size: 0px;">
+                                                                                        <a target="_blank" href="#">
+                                                                                            <img src="https://tlr.stripocdn.email/content/guids/CABINET_dd9759b09de82ede623cff0b42f718ca19c0a4f85f6337f81c705fd693708d47/images/bluebubblelikebuttoniconthumbsuplikesignfeedbackconceptwhitebackground3drendering.png" alt="" style="display: block;" width="60">
+                                                                                        </a>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Título principal -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p25b" style="letter-spacing: 5px">
+                                                                                        <p style="font-size: 14px;">FEEDBACK DA SUA CONVERSA</p>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p40b">
+                                                                                        <h1>Sua Opinião Importa para Nós</h1>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Conteúdo principal -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p40b es-p40r es-p40l es-m-p0r es-m-p0l">
+                                                                                        <p><strong>Título da Conversa:</strong></p>
+                                                                                        <h2>${currentTitle}</h2> <!-- Título da conversa aumentado -->
+                                                                                        <p><strong>Análise da interação:</strong></p>
+                                                                                        ${analysis}
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Transcrição da Conversa -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p20t es-p30b es-p15r es-p15l es-m-p0r es-m-p0l">
+                                                                                        <h2>Transcrição da Conversa:</h2>
+                                                                                        <pre>${conversationText}</pre>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Seção "Tem alguma pergunta?" após a transcrição -->
+                                                                                <tr>
+                                                                                    <td class="esd-structure es-p30t es-p30b es-p20r es-p20l esdev-adapt-off" align="left" background="https://tlr.stripocdn.email/content/guids/CABINET_beef27fd72bf04f5ec347afb3c9242a7a6cb9763af3e70ce8481235882b7a5b6/images/rectangle_5445.png" style="background-image: url('https://tlr.stripocdn.email/content/guids/CABINET_beef27fd72bf04f5ec347afb3c9242a7a6cb9763af3e70ce8481235882b7a5b6/images/rectangle_5445.png'); background-repeat: no-repeat; background-position: center center;">
+                                                                                        <table width="560" cellpadding="0" cellspacing="0" class="esdev-mso-table">
+                                                                                            <tbody>
+                                                                                                <tr>
+                                                                                                    <td class="esdev-mso-td" valign="top">
+                                                                                                        <table cellpadding="0" cellspacing="0" class="es-left" align="left">
+                                                                                                            <tbody>
+                                                                                                                <tr>
+                                                                                                                    <td width="223" class="esd-container-frame" align="left">
+                                                                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                                                                            <tbody>
+                                                                                                                                <tr>
+                                                                                                                                    <td align="right" class="esd-block-image" style="font-size: 0px;">
+                                                                                                                                        <a target="_blank" href="#">
+                                                                                                                                            <img class="adapt-img" src="https://tlr.stripocdn.email/content/guids/CABINET_beef27fd72bf04f5ec347afb3c9242a7a6cb9763af3e70ce8481235882b7a5b6/images/32226255_m001t0311_a_message_01sep22.png" alt="" style="display: block;" width="100">
+                                                                                                                                        </a>
+                                                                                                                                    </td>
+                                                                                                                                </tr>
+                                                                                                                            </tbody>
+                                                                                                                        </table>
+                                                                                                                    </td>
+                                                                                                                </tr>
+                                                                                                            </tbody>
+                                                                                                        </table>
+                                                                                                    </td>
+                                                                                                    <td width="20"></td>
+                                                                                                    <td class="esdev-mso-td" valign="top">
+                                                                                                        <table cellpadding="0" cellspacing="0" class="es-right" align="right">
+                                                                                                            <tbody>
+                                                                                                                <tr>
+                                                                                                                    <td width="317" align="left" class="esd-container-frame">
+                                                                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                                                                            <tbody>
+                                                                                                                                <tr>
+                                                                                                                                    <td align="left" class="esd-block-text es-p20t es-p20b">
+                                                                                                                                        <p>Tem alguma pergunta?<br><a target="_blank" href="https://plusoft-expi.vercel.app">Entre em contato com nossa equipe</a></p>
+                                                                                                                                    </td>
+                                                                                                                                </tr>
+                                                                                                                            </tbody>
+                                                                                                                        </table>
+                                                                                                                    </td>
+                                                                                                                </tr>
+                                                                                                            </tbody>
+                                                                                                        </table>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Espaçamento adicional -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-spacer" height="20"></td>
+                                                                                </tr>
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </td>
+                                                                </tr>
+                                                                <!-- Outros conteúdos podem ser adicionados aqui -->
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                                <!-- Rodapé -->
+                                                <tr>
+                                                    <td class="esd-structure es-p40t es-p40b es-p20r es-p20l" align="left" background="https://expi-five.vercel.app/background.png" style="background-image: url('https://expi-five.vercel.app/background.png'); background-repeat: no-repeat; background-position: center bottom;">
+                                                          <table cellpadding="0" cellspacing="0" width="100%">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td width="560" align="left" class="esd-container-frame">
+                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                            <tbody>
+                                                                                <!-- Ícones de redes sociais -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-social" style="font-size:0">
+                                                                                        <table cellpadding="0" cellspacing="0" class="es-table-not-adapt es-social">
+                                                                                            <tbody>
+                                                                                                <tr>
+                                                                                                    <td align="center" valign="top" class="es-p40r">
+                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/facebook-logo-white.png" alt="Fb" title="Facebook" height="24"></a>
+                                                                                                    </td>
+                                                                                                    <td align="center" valign="top" class="es-p40r">
+                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/x-logo-white.png" alt="Tw" title="Twitter" height="24"></a>
+                                                                                                    </td>
+                                                                                                    <td align="center" valign="top" class="es-p40r">
+                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/instagram-logo-white.png" alt="Ig" title="Instagram" height="24"></a>
+                                                                                                    </td>
+                                                                                                    <td align="center" valign="top">
+                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/youtube-logo-white.png" alt="Yt" title="Youtube" height="24"></a>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Linha separadora -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-spacer es-p20" style="font-size:0">
+                                                                                        <table border="0" width="65%" height="100%" cellpadding="0" cellspacing="0">
+                                                                                            <tbody>
+                                                                                                <tr>
+                                                                                                    <td style="border-bottom: 1px solid #ffffff; background: unset; height: 1px; width: 100%; margin: 0px;"></td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Texto de agradecimento -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p15t es-p40b">
+                                                                                        <p>Obrigado por usar nosso serviço!</p>
+                                                                                        <p>Este e-mail foi enviado automaticamente, por favor, não responda.</p>
+                                                                                        <p>Visite nosso site: <a href="https://plusoft-expi.vercel.app" target="_blank">https://plusoft-expi.vercel.app</a></p>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Logo adicional no rodapé, se desejar -->
+                                                                                <!--
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-image es-infoblock made_with" style="font-size:0">
+                                                                                        <a target="_blank" href="#">
+                                                                                            <img src="https://link-para-sua-logo.png" alt="" width="125" style="display: block;">
+                                                                                        </a>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                -->
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                                <!-- Fim do Rodapé -->
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <!-- Fim do conteúdo principal -->
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>
+`;
+
+
+
+  
+      // Enviar e-mail com a análise
       await axios.post('/api/sendEmail', {
-        to: userEmail,
+        to: sessionStorage.getItem("userEmail"),
         subject: emailSubject,
-        text: emailText,
-        html: emailHtml
+        text: `Aqui está o feedback da sua conversa:
+  
+  Título da Conversa: ${currentTitle}
+  
+  Análise:
+  ${analysis}
+  
+  Conversa:
+  ${conversationText}`,
+        html: emailHtml,
       });
   
-      setModalLoading(false);
-  
-      // Continua com a análise de feedback
+      // Categorizar o feedback
       const categorizationPrompt = `
         Dado o seguinte feedback:
   
@@ -445,9 +965,9 @@ export function Chat() {
         categorize essa conversa como "Bom", "Ruim", "Neutro", "Insatisfeito" 
         apenas com uma única dessas palavras E MAIS NENHUMA OUTRA. Analise e use sentimentos para categorizar de forma mais assertiva possível.
       `;
-  
+      
       const categorizationResponse = await client.post("/chat/completions", {
-        model: "gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [
           { role: "system", content: "Você é um assistente útil que categoriza feedbacks." },
           { role: "user", content: categorizationPrompt }
@@ -481,21 +1001,21 @@ export function Chat() {
       // Preparar o feedback para salvar via API
       const feedbackData = {
         id: feedbackId,
-        usuario: userEmail,
+        usuario: sessionStorage.getItem("userEmail"),
         comentario: analysis,
         rating: categoryResult,
         data: new Date().toISOString(),
       };
   
       // Enviar o feedback completo para a API
-      const apiResponse = await axios.post("/api/feedback", feedbackData, {
+      await axios.post("/api/feedback", feedbackData, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
   
-      console.log("Feedback enviado com sucesso:", apiResponse.data);
-  
+      console.log("Feedback enviado com sucesso!");
+      
       // Desativar o estado de carregamento
       setModalLoading(false);
   
@@ -506,6 +1026,7 @@ export function Chat() {
       setModalLoading(false);
     }
   };
+  
   
 
   const handleCloseFeedbackModal = () => {
@@ -585,41 +1106,72 @@ useEffect(() => {
 }, [selectedTab, tutorialShown]); // Dispara quando selectedTab ou tutorialShown mudam
 
 
+const [emailError, setEmailError] = useState('');
+
+  const verifyEmail = async (email: string) => {
+    const apiKey = process.env.NEXT_PUBLIC_ABSTRACT_API_KEY;// Adicione sua chave API ao .env.local
+    const url = `https://emailvalidation.abstractapi.com/v1/?api_key=${apiKey}&email=${email}`;
+
+    try {
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao verificar e-mail:', error);
+      return null;
+    }
+  };
 
   const handleSaveUserEmail = async () => {
+    setEmailError('');
     if (inputEmail.trim() === "") {
-      alert("Por favor, insira um e-mail válido.");
+      setEmailError("Por favor, insira um e-mail válido.");
       return;
     }
-  
+
     try {
+      const result = await verifyEmail(inputEmail);
+      
+      if (!result) {
+        setEmailError("Não foi possível verificar o e-mail. Tente novamente mais tarde.");
+        return;
+      }
+
+      if (result.deliverability === "UNDELIVERABLE") {
+        setEmailError("Este e-mail parece não ser válido ou não existe.");
+        return;
+      }
+
+      if (result.is_disposable_email.value) {
+        setEmailError("Por favor, use um e-mail não descartável.");
+        return;
+      }
+
+      // Se chegou até aqui, o e-mail é considerado válido
       const newUserId = await getNextUserId();
-      // Salva o e-mail no sessionStorage e Firebase
       sessionStorage.setItem("userEmail", inputEmail);
       sessionStorage.setItem("userId", newUserId);
-      setUserName(inputEmail); // Usa o e-mail como identificador do usuário
+      setUserName(inputEmail);
       setUserId(newUserId);
       setIsUserModalOpen(false);
     } catch (error) {
       console.error("Erro ao salvar o e-mail:", error);
+      setEmailError("Ocorreu um erro ao verificar o e-mail. Tente novamente.");
     }
   };
   
 
   return (
-     
     <div className="flex flex-col h-screen">
       {/* Verifica se algum tutorial está ativo e exibe */}
       {isTutorialOpen && tutorialType === 'voicechat' && (
         <TutorialVoice onClose={() => setIsTutorialOpen(false)} />
       )}
-     
+      
       {isTutorialOpen && tutorialType === 'history' && (
         <TutorialExpi onClose={() => setIsTutorialOpen(false)} />
       )}
-     
-
-    {/* Cabeçalho com o botão de nova conversa */}
+      
+      {/* Cabeçalho com o botão de nova conversa */}
       <header className="bg-primary text-primary-foreground py-4 px-6 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <Avatar className="w-8 h-8">
@@ -628,51 +1180,48 @@ useEffect(() => {
           </Avatar>
           <h1 className="text-xl font-bold">Expi</h1>
         </div>
-
+  
         <div className="flex items-center gap-2">
-          {/* Ícone para abrir o modal de nome do usuário */}
           <Avatar className="w-8 h-8 cursor-pointer" onClick={() => setIsUserModalOpen(true)}>
             <AvatarImage src="/user.png" alt="User" />
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
           <p className="text-sm">
-            {userName ? `Olá, ${userName}` : "Insira seu nome"}
+            {userName ? `Olá, ${userName}` : "Insira seu e-mail"}
           </p>
         </div>
         <Button onClick={handleNewConversation} variant="ghost" className="p-2 rounded-full">
           Nova Conversa
         </Button>
       </header>
-
-      {/* Reutilizando o Modal para o usuário inserir o nome */}
+  
+      {/* Modal para o usuário inserir o e-mail */}
       {isUserModalOpen && (
-       <Modal
-       isOpen={isUserModalOpen}
-       onClose={() => setIsUserModalOpen(false)}
-       title="Insira seu e-mail"
-       isLoading={modalLoading}
-     >
-       <Input
-         placeholder="Seu e-mail"
-         value={inputEmail}
-         onChange={(e) => setInputEmail(e.target.value)} // Captura o e-mail
-       />
-       <Button onClick={handleSaveUserEmail}>Salvar</Button>
-     </Modal>
+      <Modal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        title="Insira seu e-mail"
+        isLoading={modalLoading}
+      >
+        <Input
+          placeholder="Seu e-mail"
+          value={inputEmail}
+          onChange={(e) => setInputEmail(e.target.value)}
+        />
+        {emailError && <p className="text-red-500 mt-2">{emailError}</p>}
+        <Button onClick={handleSaveUserEmail}>Salvar</Button>
+      </Modal>
       )}
-
+  
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar com Abas */}
-        <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col h-full"> {/* Set h-full */}
+        <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col h-full">
         <Tabs defaultValue="history" className="flex-1 flex flex-col h-full" onValueChange={(value) => {
-    // Verifica se o valor é um dos permitidos no tipo Tab antes de setá-lo
-    if (["voicechat", "gptvoice", "history", "modoescu"].includes(value)) {
-      setSelectedTab(value as Tab); // Converte para o tipo Tab
-    }
-  }}
->
-          {/* Updated TabsList */}
-          <TabsList className="border-b flex overflow-x-auto w-full"> {/* w-full and overflow-x-auto */}
+          if (["voicechat", "gptvoice", "history", "modoescu"].includes(value)) {
+            setSelectedTab(value as Tab);
+          }
+        }}>
+          <TabsList className="border-b flex overflow-x-auto w-full">
             <TabsTrigger value="history" className="min-w-max text-center px-2 py-2">
                 Expi
             </TabsTrigger>
@@ -686,8 +1235,7 @@ useEffect(() => {
                 Configs
             </TabsTrigger>
           </TabsList>
-
-          {/* Add overflow-auto to make sure content inside can scroll if needed */}
+  
           <TabsContent value="voicechat" className="flex-1 p-4 overflow-auto">
             <Canais
               usersInCall={usersInCall}
@@ -699,11 +1247,11 @@ useEffect(() => {
               addVoiceMessage={addVoiceMessage}
             />
           </TabsContent>
-
+  
           <TabsContent value="gptvoice" className="flex-1 p-4 overflow-auto">
             <GptChat userName={userName} userId={userId} onMessagesUpdate={handleMessagesUpdate} />
           </TabsContent>
-
+  
           <TabsContent value="modoescu" className="flex-1 p-4 overflow-auto">
             <button
               onClick={toggleTheme}
@@ -712,7 +1260,7 @@ useEffect(() => {
               {isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
             </button>
           </TabsContent>
-
+  
           <TabsContent value="history" className="flex-1 p-4 overflow-auto">
             <div className="p-4 border-b">
               <Input placeholder="Search conversations" className="w-full" />
@@ -751,212 +1299,318 @@ useEffect(() => {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Área de Conteúdo Principal */}
-      <div className="flex-1 flex flex-col bg-background h-full">
-        {selectedTab === "voicechat" ? (
-          <div className="flex flex-col flex-1 p-4 rounded-lg shadow h-full">
-            
-            {/* Cabeçalho das Abas */}
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold">Canais de Voz</h2>
-            </div>
-
-            {/* Lista de Usuários na Chamada */}
-            {usersInCall && usersInCall.length > 0 ? (
-              <div className="flex flex-wrap justify-center gap-6 w-full mb-4">
-                {usersInCall.map((user: string, index: number) => (
-                  <div
-                    key={index}
-                    className="flex flex-col items-center bg-card p-4 rounded-lg shadow w-1/4 min-w-[150px]"
-                  >
-                    <Avatar className="w-16 h-16 bg-primary-foreground text-primary">
-                      <AvatarImage src="/user.png" alt={`User ${index}`} />
-                      <AvatarFallback>{user.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="mt-2 text-center text-foreground">
-                      {user === "self" ? userName : user}
-                    </span>
-                  </div>
-                ))}
+  
+        {/* Área de Conteúdo Principal */}
+        <div className="flex-1 flex flex-col bg-background h-full">
+          {selectedTab === "voicechat" ? (
+            <div className="flex flex-col flex-1 p-4 rounded-lg shadow h-full">
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold">Canais de Voz</h2>
               </div>
-            ) : (
-              <p className="text-muted-foreground mb-4">Nenhum usuário conectado ainda</p>
-            )}
-
-            {/* Cabeçalho da Conversa de Voz */}
-            <div className="mb-2">
-              <h3 className="text-lg font-semibold">Conversa de Voz</h3>
-            </div>
-
-            {/* Área de Mensagens com Rolagem */}
-            <div className="flex-1 overflow-auto p-6">
-              <div className="space-y-4 pb-12">
-                {voiceMessages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-start ${
-                      message.senderId === userId ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    {message.senderId !== userId && (
-                      <div className="flex items-center mr-2">
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src="/user.png" alt={message.senderName} />
-                          <AvatarFallback>
-                            {message.senderName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="ml-2 text-sm">
-                          {message.senderName}
-                        </span>
-                      </div>
-                    )}
+  
+              {usersInCall && usersInCall.length > 0 ? (
+                <div className="flex flex-wrap justify-center gap-6 w-full mb-4">
+                  {usersInCall.map((user: string, index: number) => (
                     <div
-                      className={`p-2 rounded-md max-w-md ${
-                        message.senderId === userId
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground"
+                      key={index}
+                      className="flex flex-col items-center bg-card p-4 rounded-lg shadow w-1/4 min-w-[150px]"
+                    >
+                      <Avatar className="w-16 h-16 bg-primary-foreground text-primary">
+                        <AvatarImage src="/user.png" alt={`User ${index}`} />
+                        <AvatarFallback>{user.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span className="mt-2 text-center text-foreground">
+                        {user === "self" ? userName : user}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground mb-4">Nenhum usuário conectado ainda</p>
+              )}
+  
+              <div className="mb-2">
+                <h3 className="text-lg font-semibold">Conversa de Voz</h3>
+              </div>
+  
+              <div className="flex-1 overflow-auto p-6">
+                <div className="space-y-4 pb-12">
+                  {voiceMessages.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-start ${
+                        message.senderId === userId ? "justify-end" : "justify-start"
                       }`}
                     >
-                      <p>{message.content}</p>
-                    </div>
-                    {message.senderId === userId && (
-                      <div className="flex items-center ml-2">
-                        <span className="mr-2 text-sm">{userName}</span>
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src="/user.png" alt={userName} />
-                          <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
-                        </Avatar>
+                      {message.senderId !== userId && (
+                        <div className="flex items-center mr-2">
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src="/user.png" alt={message.senderName} />
+                            <AvatarFallback>
+                              {message.senderName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="ml-2 text-sm">
+                            {message.senderName}
+                          </span>
+                        </div>
+                      )}
+                      <div
+                        className={`p-2 rounded-md max-w-md ${
+                          message.senderId === userId
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground"
+                        }`}
+                      >
+                        <p>{message.content}</p>
                       </div>
-                    )}
-                  </div>
-                ))}
-                {/* Referência para scroll automático */}
-                <div ref={messageEndRef} />
+                      {message.senderId === userId && (
+                        <div className="flex items-center ml-2">
+                          <span className="mr-2 text-sm">{userName}</span>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src="/user.png" alt={userName} />
+                            <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div ref={messageEndRef} />
+                </div>
+              </div>
+  
+              <div className="border-t p-4 bg-background">
+                {/* Elementos estáticos aqui, se necessário */}
+              </div>
+  
+            </div>
+          ) : selectedTab === "gptvoice" ? (
+            <div className="flex flex-col flex-1 p-4 rounded-lg shadow overflow-auto">
+              <h2 className="text-2xl font-bold mb-4 text-center">Conversa com Expi Express</h2>
+  
+              <div className="w-full max-w-2xl mx-auto bg-background rounded-md p-4 mt-6 overflow-y-auto h-full">
+                <h3 className="text-lg font-semibold mb-2 text-center">Conversa de Voz</h3>
+                <div className="space-y-4">
+                  {gptMessages.map((message, index) => (
+                    <div key={index} className={`flex items-start ${message.senderId === userId ? 'justify-end' : 'justify-start'}`}>
+                      {message.senderId !== userId && (
+                        <div className="flex items-center mr-2">
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src="/logo.png" alt={message.senderName} />
+                            <AvatarFallback>{message.senderName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <span className="ml-2 text-sm">{message.senderName}</span>
+                        </div>
+                      )}
+                      <div className={`p-2 rounded-md max-w-xs ${message.senderId === userId ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
+                        <p>{message.content}</p>
+                      </div>
+                      {message.senderId === userId && (
+                        <div className="flex items-center ml-2">
+                          <span className="mr-2 text-sm">{userName}</span>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src="/user.png" alt={userName} />
+                            <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+  
+                  {isLoading && (
+                    <div className="flex items-center justify-start mt-4">
+                      <div className="loader"></div>
+                      <span className="ml-2">Aguardando resposta...</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-
-            {/* Barra Estática no Fundo */}
-            <div className="border-t p-4 bg-background">
-              {/* Você pode adicionar elementos estáticos aqui, se necessário */}
-            </div>
-
-          </div>
-        ) : selectedTab === "gptvoice" ? (
-          <div className="flex flex-col flex-1 p-4 rounded-lg shadow overflow-auto">
-            {/* Centralizar o título principal */}
-            <h2 className="text-2xl font-bold mb-4 text-center">Conversa com Expi Express</h2>
-
-            <div className="w-full max-w-2xl mx-auto bg-background rounded-md p-4 mt-6 overflow-y-auto h-full">
-              {/* Centralizar o subtítulo da conversa de voz */}
-              <h3 className="text-lg font-semibold mb-2 text-center">Conversa de Voz</h3>
-              <div className="space-y-4">
-                {gptMessages.map((message, index) => (
-                  <div key={index} className={`flex items-start ${message.senderId === userId ? 'justify-end' : 'justify-start'}`}>
-                    {message.senderId !== userId && (
-                      <div className="flex items-center mr-2">
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src="/logo.png" alt={message.senderName} />
-                          <AvatarFallback>{message.senderName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <span className="ml-2 text-sm">{message.senderName}</span>
-                      </div>
-                    )}
-                    <div className={`p-2 rounded-md max-w-xs ${message.senderId === userId ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
-                      <p>{message.content}</p>
-                    </div>
-                    {message.senderId === userId && (
-                      <div className="flex items-center ml-2">
-                        <span className="mr-2 text-sm">{userName}</span>
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src="/user.png" alt={userName} />
-                          <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Indicador de Carregamento */}
-                {isLoading && (
-                  <div className="flex items-center justify-start mt-4">
-                    <div className="loader"></div>
-                    <span className="ml-2">Aguardando resposta...</span>
-                  </div>
-                )}
-
+          ) : (
+            <>
+           <div className="flex-1 p-6 overflow-auto">
+        <AnimatePresence>
+          {messages.map((message, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className={`flex items-start gap-4 mb-4 ${message.role === "user" ? "justify-end" : ""}`}
+            >
+              {message.role === "ai" && (
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src="/logo.png" alt="Chatbot" />
+                    <AvatarFallback><FiMessageSquare /></AvatarFallback>
+                  </Avatar>
+                </motion.div>
+              )}
+              <motion.div
+                className={`p-4 rounded-lg max-w-[80%] ${
+                  message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                }`}
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <p>{message.content}</p>
+              </motion.div>
+              {message.role === "user" && (
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src="/user.png" alt="User" />
+                    <AvatarFallback><FiUser /></AvatarFallback>
+                  </Avatar>
+                </motion.div>
+              )}
+            </motion.div>
+          ))}
+          {loading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex justify-start mb-4"
+            >
+              <TypingIndicator />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div ref={messageEndRef} />
+      </div>
+{/* Visualização de Sentimentos */}
+<div className="p-4 border-t">
+  <h3 className="text-lg font-semibold mb-2">Sentimento da Conversa</h3>
+  <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 relative">
+    {currentSentiment !== null ? (
+      <motion.div 
+        className="h-2.5 rounded-full"
+        style={{
+          backgroundColor: currentSentiment > 0 ? '#4CAF50' : currentSentiment < 0 ? '#F44336' : '#FFC107',
+        }}
+        initial={{ width: "50%" }}
+        animate={{ 
+          width: `${(currentSentiment + 1) * 50}%`,
+          backgroundColor: [
+            currentSentiment > 0 ? '#4CAF50' : currentSentiment < 0 ? '#F44336' : '#FFC107',
+            currentSentiment > 0.3 ? '#2E7D32' : currentSentiment < -0.3 ? '#C62828' : '#FFA000'
+          ]
+        }}
+        transition={{ duration: 0.5, ease: "easeInOut" }}
+      />
+    ) : (
+      <div className="text-center text-sm text-gray-500">Sentimento indisponível</div>
+    )}
+  </div>
+  <div className="flex justify-between mt-2">
+    <motion.div
+      animate={{ 
+        scale: currentSentiment !== null && currentSentiment < -0.3 ? [1, 1.2, 1] : 1,
+        rotate: currentSentiment !== null && currentSentiment < -0.3 ? [0, -10, 0, 10, 0] : 0
+      }}
+      transition={{ duration: 0.5, repeat: currentSentiment !== null && currentSentiment < -0.3 ? Infinity : 0, repeatDelay: 1 }}
+    >
+      {currentSentiment !== null && currentSentiment < -0.3 ? (
+        <FaRegSadTear size={24} color="#C62828" />
+      ) : currentSentiment !== null && currentSentiment < 0 ? (
+        <FaRegFrown size={24} color="#F44336" />
+      ) : (
+        <FaRegMeh size={24} color="#FFC107" />
+      )}
+    </motion.div>
+    <motion.div
+      animate={{ 
+        scale: currentSentiment !== null && currentSentiment > 0.3 ? [1, 1.2, 1] : 1,
+        rotate: currentSentiment !== null && currentSentiment > 0.3 ? [0, -10, 0, 10, 0] : 0
+      }}
+      transition={{ duration: 0.5, repeat: currentSentiment !== null && currentSentiment > 0.3 ? Infinity : 0, repeatDelay: 1 }}
+    >
+      {currentSentiment !== null && currentSentiment > 0.3 ? (
+        <FaRegLaughBeam size={24} color="#2E7D32" />
+      ) : currentSentiment !== null && currentSentiment > 0 ? (
+        <FaRegSmile size={24} color="#4CAF50" />
+      ) : (
+        <FaRegMeh size={24} color="#FFC107" />
+      )}
+    </motion.div>
+  </div>
+  {currentSentiment !== null && (
+    <motion.p 
+      className="mt-2 text-sm text-center"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      {currentSentiment > 0.3 ? "Muito Positivo" : 
+       currentSentiment > 0 ? "Levemente Positivo" :
+       currentSentiment < -0.3 ? "Muito Negativo" : 
+       currentSentiment < 0 ? "Levemente Negativo" : "Neutro"}
+    </motion.p>
+  )}
+</div>
+  
+              {/* Nuvem de Palavras Simplificada */}
+              <div className="p-4 border-t">
+                <h3 className="text-lg font-semibold mb-2">Palavras Mais Frequentes</h3>
+                <div className="flex flex-wrap gap-2">
+                  {wordCloudData.slice(0, 20).map((word, index) => (
+                    <span 
+                      key={index} 
+                      className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full"
+                      style={{ fontSize: `${Math.max(12, Math.min(24, 12 + word.value * 2))}px` }}
+                    >
+                      {word.text}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
+  
+              <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
+                <Textarea
+                  placeholder="Digite sua mensagem..."
+                  className="flex-1 mr-4 resize-none h-12"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+                <Button onClick={handleSubmit}>
+                  <SendIcon className="w-5 h-5" />
+                </Button>
+                <Button onClick={handleOpenFeedbackModal} variant="outline" className="ml-2">
+                  Finalizar Conversa
+                </Button>
+                <Modal
+                  isOpen={isFeedbackModalOpen}
+                  onClose={handleCloseFeedbackModal}
+                  title={modalTitle}
+                  isLoading={modalLoading}
+                >
+                  <p>{feedbackAnalysis || "Seu feedback foi enviado com sucesso!"}</p>
+                </Modal>
 
-
-        ) : (
-          <>
-            <div className="flex-1 p-6 overflow-auto">
-              <div className="grid gap-4">
-                {messages.map((message, index) => (
-                  <div key={index} className={`flex items-start gap-4 ${message.role === "user" ? "justify-end" : ""}`}>
-                    {message.role === "ai" && (
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src="/logo.png" alt="Chatbot" />
-                        <AvatarFallback>CB</AvatarFallback>
-                      </Avatar>
-                    )}
-                    <div className={`p-4 rounded-lg max-w-[80%] ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                      <p>{message.content}</p>
-                    </div>
-                    {message.role === "user" && (
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src="/user.png" alt="User" />
-                        <AvatarFallback>U</AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                ))}
-                {loading && (
-                  <div className="flex justify-center">
-                    <p>Digitando...</p>
-                  </div>
-                )}
-              </div>
-              <div ref={messageEndRef} />
-            </div>
-
-            <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
-              <Textarea
-                placeholder="Digite sua mensagem..."
-                className="flex-1 mr-4 resize-none h-12"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-              <Button onClick={handleSubmit}>
-                <SendIcon className="w-5 h-5" />
-              </Button>
-              <Button onClick={handleOpenFeedbackModal} variant="outline" className="ml-2">
-                Finalizar Conversa
-              </Button>
-              <Modal
-  isOpen={isUserModalOpen}
-  onClose={() => setIsUserModalOpen(false)}
-  title="Insira seu e-mail"
-  isLoading={modalLoading}
+                <Modal
+  isOpen={isErrorModalOpen}
+  onClose={() => setIsErrorModalOpen(false)}
+  title="Erro"
+  isLoading={false}
 >
-  <Input
-    placeholder="Seu e-mail"
-    value={inputEmail}
-    onChange={(e) => setInputEmail(e.target.value)} // Captura o e-mail
-  />
-  <Button onClick={handleSaveUserEmail}>Salvar</Button>
+  <p>{errorMessage}</p>
 </Modal>
-            </div>
-          </>
-        )}
+                
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 
 
 }
@@ -1001,3 +1655,7 @@ function SendIcon(props: React.JSX.IntrinsicAttributes & React.SVGProps<SVGSVGEl
     </svg>
   );
 }
+function useTypewriter(arg0: { words: string[]; loop: number; typeSpeed: number; }): [any] {
+  throw new Error("Function not implemented.");
+}
+
