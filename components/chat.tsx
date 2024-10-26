@@ -402,44 +402,52 @@ export function Chat() {
     if (promptText) {
       setLoading(true);
       setIsTyping(true);
-
+  
       const newMessages: Message[] = [
         ...messages,
         { role: "user", content: promptText },
       ];
       setMessages(newMessages);
       updateWordCloud(promptText);
-
-      const apiMessages = newMessages.map((msg) => ({
-        role: msg.role === "ai" ? "assistant" as const : msg.role,
-        content: msg.content,
-      }));
-
+  
+      const systemMessage = {
+        role: "system",
+        content: "Você é um atendente virtual de uma loja online chamada 'Loja expi'. Sua função é ajudar os clientes com informações sobre produtos, preços, disponibilidade, pedidos, entregas e políticas da loja. Seja sempre educado, profissional e prestativo."
+      };
+  
+      const apiMessages = [
+        systemMessage,
+        ...newMessages.map((msg) => ({
+          role: msg.role === "ai" ? "assistant" as const : msg.role,
+          content: msg.content,
+        })),
+      ];
+  
       const data = {
         model: "gpt-3.5-turbo",
         messages: apiMessages,
       };
-
+  
       try {
         const result = await client.post("/chat/completions", data);
         const response = result.data.choices[0].message.content;
-
+  
         setIsTyping(false);
         
         // Iniciar a animação de digitação
         await handleTypeEffect(response);
-
+  
         const updatedMessages: Message[] = [...newMessages, { role: "ai", content: response }];
         setMessages(updatedMessages);
         updateWordCloud(response);
-
+  
         // Analisar sentimento após cada mensagem
         const newSentiment = await analyzeSentimentGPT(updatedMessages);
         setCurrentSentiment(newSentiment);
-
+  
         // Animar a barra de sentimento
         controls.start({ width: `${(newSentiment + 1) * 50}%` });
-
+  
         setInputValue("");
         await saveConversation(updatedMessages);
       } catch (error) {
