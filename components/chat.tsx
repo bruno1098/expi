@@ -1550,22 +1550,7 @@ const [emailError, setEmailError] = useState('');
   )}
 </div>
   
-              {/* Nuvem de Palavras Simplificada */}
-              <div className="p-4 border-t">
-                <h3 className="text-lg font-semibold mb-2">Palavras Mais Frequentes</h3>
-                <div className="flex flex-wrap gap-2">
-                  {wordCloudData.slice(0, 20).map((word, index) => (
-                    <span 
-                      key={index} 
-                      className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full"
-                      style={{ fontSize: `${Math.max(12, Math.min(24, 12 + word.value * 2))}px` }}
-                    >
-                      {word.text}
-                    </span>
-                  ))}
-                </div>
-              </div>
-  
+             
               <div className="border-t p-4 flex items-center justify-between sticky bottom-0 bg-background">
                 <Textarea
                   placeholder="Digite sua mensagem..."
