@@ -667,11 +667,11 @@ export function Chat() {
     <style>
         body, p, h1, h2, h3, h4, h5, h6, pre {
             font-family: 'Manrope', sans-serif;
-            color: #ffffff !important; /* Texto sempre em branco */
+            color: #ffffff !important;
         }
         a {
             text-decoration: none;
-            color: #ffffff !important; /* Links em branco */
+            color: #ffffff !important;
         }
         pre {
             background-color: #3b3b3b;
@@ -691,18 +691,18 @@ export function Chat() {
             background-color: transparent;
         }
         h1 {
-            font-size: 40px !important; /* Aumenta o tamanho do título principal */
+            font-size: 40px !important;
             line-height: 1.2;
         }
         h2 {
-            font-size: 28px !important; /* Aumenta o tamanho dos subtítulos */
+            font-size: 28px !important;
             line-height: 1.3;
         }
         .analysis-title {
-            font-size: 24px !important; /* Reduz um pouco o tamanho da fonte */
+            font-size: 24px !important;
         }
         p {
-            font-size: 16px !important; /* Aumenta o tamanho do texto */
+            font-size: 16px !important;
             line-height: 1.5;
         }
         .es-header-logo img {
@@ -710,10 +710,10 @@ export function Chat() {
             margin: 0 auto;
         }
         .es-content-body {
-            padding-top: 50px; /* Ajusta o padding superior para posicionar melhor o conteúdo */
+            padding-top: 50px;
         }
         .es-header {
-            padding-top: 30px; /* Ajusta o padding superior do cabeçalho */
+            padding-top: 30px;
         }
     </style>
 </head>
@@ -778,7 +778,7 @@ export function Chat() {
                                                                                 <tr>
                                                                                     <td align="center" class="esd-block-text es-p40b es-p40r es-p40l es-m-p0r es-m-p0l">
                                                                                         <p><strong>Título da Conversa:</strong></p>
-                                                                                        <h2 class="analysis-title">${currentTitle}</h2> <!-- Título da conversa ajustado -->
+                                                                                        <h2 class="analysis-title">${currentTitle}</h2>
                                                                                         <p><strong>Análise da interação:</strong></p>
                                                                                         ${analysis}
                                                                                     </td>
@@ -866,21 +866,21 @@ export function Chat() {
                                                                             <tbody>
                                                                                 <!-- Ícones de redes sociais -->
                                                                                 <tr>
-                                                                                    <td align="center" class="esd-block-social" style="font-size:0">
+                                                                                    <td align="center" class="esd-block-social es-p30b" style="font-size:0">
                                                                                         <table cellpadding="0" cellspacing="0" class="es-table-not-adapt es-social">
                                                                                             <tbody>
                                                                                                 <tr>
                                                                                                     <td align="center" valign="top" class="es-p40r">
-                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/facebook-logo-white.png" alt="Fb" title="Facebook" height="24"></a>
+                                                                                                        <a target="_blank" href="https://www.facebook.com/suaempresa"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/facebook-logo-white.png" alt="Facebook" title="Facebook" height="24"></a>
                                                                                                     </td>
                                                                                                     <td align="center" valign="top" class="es-p40r">
-                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/x-logo-white.png" alt="Tw" title="Twitter" height="24"></a>
+                                                                                                        <a target="_blank" href="https://twitter.com/suaempresa"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/x-logo-white.png" alt="Twitter" title="Twitter" height="24"></a>
                                                                                                     </td>
                                                                                                     <td align="center" valign="top" class="es-p40r">
-                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/instagram-logo-white.png" alt="Ig" title="Instagram" height="24"></a>
+                                                                                                        <a target="_blank" href="https://www.instagram.com/suaempresa"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/instagram-logo-white.png" alt="Instagram" title="Instagram" height="24"></a>
                                                                                                     </td>
                                                                                                     <td align="center" valign="top">
-                                                                                                        <a target="_blank" href="#"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/youtube-logo-white.png" alt="Yt" title="Youtube" height="24"></a>
+                                                                                                        <a target="_blank" href="https://www.youtube.com/suaempresa"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/youtube-logo-white.png" alt="YouTube" title="YouTube" height="24"></a>
                                                                                                     </td>
                                                                                                 </tr>
                                                                                             </tbody>
@@ -899,24 +899,31 @@ export function Chat() {
                                                                                         </table>
                                                                                     </td>
                                                                                 </tr>
-                                                                                <!-- Texto de agradecimento -->
+                                                                                <!-- Texto de agradecimento e informações de contato -->
                                                                                 <tr>
-                                                                                    <td align="center" class="esd-block-text es-p15t es-p40b">
+                                                                                    <td align="center" class="esd-block-text es-p15t es-p15b">
                                                                                         <p>Obrigado por usar nosso serviço!</p>
                                                                                         <p>Este e-mail foi enviado automaticamente, por favor, não responda.</p>
-                                                                                        <p>Visite nosso site: <a href="https://plusoft-expi.vercel.app" target="_blank">https://plusoft-expi.vercel.app</a></p>
                                                                                     </td>
                                                                                 </tr>
-                                                                                <!-- Logo adicional no rodapé, se desejar -->
-                                                                                <!--
+                                                                                <!-- Informações de contato -->
                                                                                 <tr>
-                                                                                    <td align="center" class="esd-block-image es-infoblock made_with" style="font-size:0">
-                                                                                        <a target="_blank" href="#">
-                                                                                            <img src="https://link-para-sua-logo.png" alt="" width="125" style="display: block;">
+                                                                                    <td align="center" class="esd-block-text es-p10b">
+                                                                                        <p><strong>Plusoft Tecnologia</strong></p>
+                                                                                        <p>Endereço: Rua Exemplo, 123 - São Paulo, SP</p>
+                                                                                        <p>Telefone: (11) 1234-5678</p>
+                                                                                        <p>E-mail: <a href="mailto:contato@plusoft.com.br" style="color: #ffffff;">contato@plusoft.com.br</a></p>
+                                                                                        <p>Visite nosso site: <a href="https://plusoft-expi.vercel.app" target="_blank" style="color: #ffffff;">https://plusoft-expi.vercel.app</a></p>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Logo da empresa no rodapé -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-image es-p20t" style="font-size:0">
+                                                                                        <a target="_blank" href="https://plusoft-expi.vercel.app">
+                                                                                            <img src="https://github.com/bruno1098/expi/blob/main/public/logo.png?raw=true" alt="Plusoft Tecnologia" width="100" style="display: block;">
                                                                                         </a>
                                                                                     </td>
                                                                                 </tr>
-                                                                                -->
                                                                             </tbody>
                                                                         </table>
                                                                     </td>
@@ -941,7 +948,6 @@ export function Chat() {
 </body>
 
 </html>
-
 `;
 
 
