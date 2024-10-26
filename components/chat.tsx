@@ -651,34 +651,17 @@ export function Chat() {
     </style>
     <![endif]-->
     <!--[if gte mso 9]><style>sup { font-size: 100% !important; }</style><![endif]-->
-    <!--[if gte mso 9]>
-<noscript>
-         <xml>
-           <o:OfficeDocumentSettings>
-           <o:AllowPNG></o:AllowPNG>
-           <o:PixelsPerInch>96</o:PixelsPerInch>
-           </o:OfficeDocumentSettings>
-         </xml>
-      </noscript>
-<![endif]-->
     <!--[if !mso]><!-- -->
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
     <!--<![endif]-->
     <style>
         body, p, h1, h2, h3, h4, h5, h6, pre {
             font-family: 'Manrope', sans-serif;
-            color: #ffffff !important;
+            color: #ffffff !important; /* Texto sempre em branco */
         }
         a {
             text-decoration: none;
-            color: #ffffff !important;
-        }
-        pre {
-            background-color: #3b3b3b;
-            padding: 15px;
-            border-radius: 5px;
-            color: #cccccc;
-            overflow-x: auto;
+            color: #ffffff !important; /* Links em branco */
         }
         .es-wrapper {
             background-color: #314B70;
@@ -698,9 +681,6 @@ export function Chat() {
             font-size: 28px !important;
             line-height: 1.3;
         }
-        .analysis-title {
-            font-size: 24px !important;
-        }
         p {
             font-size: 16px !important;
             line-height: 1.5;
@@ -709,22 +689,32 @@ export function Chat() {
             display: block;
             margin: 0 auto;
         }
-        .es-content-body {
-            padding-top: 50px;
+        .es-footer-body {
+            background-color: #222;
+            padding: 40px 20px;
         }
-        .es-header {
-            padding-top: 30px;
+        .footer-icon {
+            width: 24px;
+            margin: 0 10px;
+            display: inline-block;
+        }
+        .footer-socials {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .footer-text {
+            font-size: 14px;
+            text-align: center;
+            color: #cccccc;
+            margin-top: 20px;
         }
     </style>
 </head>
 
+
 <body>
     <div dir="ltr" class="es-wrapper-color">
-        <!--[if gte mso 9]>
-            <v:background xmlns:v="urn:schemas-microsoft-com:vml" fill="t">
-                <v:fill type="tile" color="#314B70"></v:fill>
-            </v:background>
-        <![endif]-->
         <table class="es-wrapper" width="100%" cellspacing="0" cellpadding="0">
             <tbody>
                 <tr>
@@ -778,7 +768,7 @@ export function Chat() {
                                                                                 <tr>
                                                                                     <td align="center" class="esd-block-text es-p40b es-p40r es-p40l es-m-p0r es-m-p0l">
                                                                                         <p><strong>Título da Conversa:</strong></p>
-                                                                                        <h2 class="analysis-title">${currentTitle}</h2>
+                                                                                        <h2 class="analysis-title">${currentTitle}</h2> <!-- Título da conversa ajustado -->
                                                                                         <p><strong>Análise da interação:</strong></p>
                                                                                         ${analysis}
                                                                                     </td>
@@ -856,90 +846,49 @@ export function Chat() {
                                                     </td>
                                                 </tr>
                                                 <!-- Rodapé -->
+                                                 <table cellpadding="0" cellspacing="0" class="es-footer es-footer-body" align="center">
+                            <tbody>
+                                <tr>
+                                    <td align="center">
+                                        <div class="footer-socials">
+                                            <a href="#" target="_blank"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/facebook-logo-white.png" class="footer-icon" alt="Facebook"></a>
+                                            <a href="#" target="_blank"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/x-logo-white.png" class="footer-icon" alt="X"></a>
+                                            <a href="#" target="_blank"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/instagram-logo-white.png" class="footer-icon" alt="Instagram"></a>
+                                            <a href="#" target="_blank"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/youtube-logo-white.png" class="footer-icon" alt="YouTube"></a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- Linha separadora -->
+                                <tr>
+                                    <td align="center" style="padding: 20px 0;">
+                                        <table border="0" width="65%" height="100%" cellpadding="0" cellspacing="0">
+                                            <tbody>
                                                 <tr>
-                                                    <td class="esd-structure es-p40t es-p40b es-p20r es-p20l" align="left" background="https://expi-five.vercel.app/background.png" style="background-image: url('https://expi-five.vercel.app/background.png'); background-repeat: no-repeat; background-position: center bottom;">
-                                                          <table cellpadding="0" cellspacing="0" width="100%">
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td width="560" align="left" class="esd-container-frame">
-                                                                        <table cellpadding="0" cellspacing="0" width="100%">
-                                                                            <tbody>
-                                                                                <!-- Ícones de redes sociais -->
-                                                                                <tr>
-                                                                                    <td align="center" class="esd-block-social es-p30b" style="font-size:0">
-                                                                                        <table cellpadding="0" cellspacing="0" class="es-table-not-adapt es-social">
-                                                                                            <tbody>
-                                                                                                <tr>
-                                                                                                    <td align="center" valign="top" class="es-p40r">
-                                                                                                        <a target="_blank" href="https://www.facebook.com/suaempresa"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/facebook-logo-white.png" alt="Facebook" title="Facebook" height="24"></a>
-                                                                                                    </td>
-                                                                                                    <td align="center" valign="top" class="es-p40r">
-                                                                                                        <a target="_blank" href="https://twitter.com/suaempresa"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/x-logo-white.png" alt="Twitter" title="Twitter" height="24"></a>
-                                                                                                    </td>
-                                                                                                    <td align="center" valign="top" class="es-p40r">
-                                                                                                        <a target="_blank" href="https://www.instagram.com/suaempresa"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/instagram-logo-white.png" alt="Instagram" title="Instagram" height="24"></a>
-                                                                                                    </td>
-                                                                                                    <td align="center" valign="top">
-                                                                                                        <a target="_blank" href="https://www.youtube.com/suaempresa"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/youtube-logo-white.png" alt="YouTube" title="YouTube" height="24"></a>
-                                                                                                    </td>
-                                                                                                </tr>
-                                                                                            </tbody>
-                                                                                        </table>
-                                                                                    </td>
-                                                                                </tr>
-                                                                                <!-- Linha separadora -->
-                                                                                <tr>
-                                                                                    <td align="center" class="esd-block-spacer es-p20" style="font-size:0">
-                                                                                        <table border="0" width="65%" height="100%" cellpadding="0" cellspacing="0">
-                                                                                            <tbody>
-                                                                                                <tr>
-                                                                                                    <td style="border-bottom: 1px solid #ffffff; background: unset; height: 1px; width: 100%; margin: 0px;"></td>
-                                                                                                </tr>
-                                                                                            </tbody>
-                                                                                        </table>
-                                                                                    </td>
-                                                                                </tr>
-                                                                                <!-- Texto de agradecimento e informações de contato -->
-                                                                                <tr>
-                                                                                    <td align="center" class="esd-block-text es-p15t es-p15b">
-                                                                                        <p>Obrigado por usar nosso serviço!</p>
-                                                                                        <p>Este e-mail foi enviado automaticamente, por favor, não responda.</p>
-                                                                                    </td>
-                                                                                </tr>
-                                                                                <!-- Informações de contato -->
-                                                                                <tr>
-                                                                                    <td align="center" class="esd-block-text es-p10b">
-                                                                                        <p><strong>Plusoft Tecnologia</strong></p>
-                                                                                        <p>Endereço: Rua Exemplo, 123 - São Paulo, SP</p>
-                                                                                        <p>Telefone: (11) 1234-5678</p>
-                                                                                        <p>E-mail: <a href="mailto:contato@plusoft.com.br" style="color: #ffffff;">contato@plusoft.com.br</a></p>
-                                                                                        <p>Visite nosso site: <a href="https://plusoft-expi.vercel.app" target="_blank" style="color: #ffffff;">https://plusoft-expi.vercel.app</a></p>
-                                                                                    </td>
-                                                                                </tr>
-                                                                                <!-- Logo da empresa no rodapé -->
-                                                                                <tr>
-                                                                                    <td align="center" class="esd-block-image es-p20t" style="font-size:0">
-                                                                                        <a target="_blank" href="https://plusoft-expi.vercel.app">
-                                                                                            <img src="https://github.com/bruno1098/expi/blob/main/public/logo.png?raw=true" alt="Plusoft Tecnologia" width="100" style="display: block;">
-                                                                                        </a>
-                                                                                    </td>
-                                                                                </tr>
-                                                                            </tbody>
-                                                                        </table>
-                                                                    </td>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </td>
+                                                    <td style="border-bottom: 1px solid #555; height: 1px; width: 100%;"></td>
                                                 </tr>
-                                                <!-- Fim do Rodapé -->
                                             </tbody>
                                         </table>
                                     </td>
                                 </tr>
+                                <!-- Texto do rodapé -->
+                                <tr>
+                                    <td class="footer-text">
+                                        <p>Obrigado por usar nosso serviço!</p>
+                                        <p>Este e-mail foi enviado automaticamente, por favor, não responda.</p>
+                                        <p>Visite nosso site: <a href="https://plusoft-expi.vercel.app" target="_blank">https://plusoft-expi.vercel.app</a></p>
+                                    </td>
+                                </tr>
+                                <!-- Logo no rodapé -->
+                                <tr>
+                                    <td align="center" style="padding-top: 20px;">
+                                        <a target="_blank" href="https://plusoft-expi.vercel.app">
+                                            <img src="https://github.com/bruno1098/expi/blob/main/public/logo.png?raw=true" alt="Logo" height="60">
+                                        </a>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
-                        <!-- Fim do conteúdo principal -->
+                        <!-- Fim do Rodapé -->
                     </td>
                 </tr>
             </tbody>
@@ -948,6 +897,7 @@ export function Chat() {
 </body>
 
 </html>
+
 `;
 
 
