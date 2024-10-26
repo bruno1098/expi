@@ -660,11 +660,12 @@ export function Chat() {
             color: #ffffff !important; /* Texto sempre em branco */
         }
             .opinion-title {
-            font-family: 'Creepster', cursive;
+            font-family: 'Horizon';
             color: #ffffff !important;
-            font-size: 36px !important;
+            font-size: 38px !important;
             line-height: 1.2;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            font-style: bold;
         }
         a {
             text-decoration: none;
