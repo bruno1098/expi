@@ -661,7 +661,7 @@ export function Chat() {
         }
             .opinion-title {
             font-family: 'Creepster', cursive;
-            color: #ff6b6b !important;
+            color: #ffffff !important;
             font-size: 36px !important;
             line-height: 1.2;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
