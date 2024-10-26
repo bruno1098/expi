@@ -682,6 +682,10 @@ export function Chat() {
         }
         .es-wrapper {
             background-color: #314B70;
+            background-image: url('https://expi-five.vercel.app/background.png');
+            background-repeat: repeat-y;
+            background-size: 100% auto;
+            background-position: top center;
         }
         .es-content-body {
             background-color: transparent;
@@ -693,6 +697,9 @@ export function Chat() {
         h2 {
             font-size: 28px !important; /* Aumenta o tamanho dos subtítulos */
             line-height: 1.3;
+        }
+        .analysis-title {
+            font-size: 24px !important; /* Reduz um pouco o tamanho da fonte */
         }
         p {
             font-size: 16px !important; /* Aumenta o tamanho do texto */
@@ -718,8 +725,8 @@ export function Chat() {
                 <v:fill type="tile" color="#314B70"></v:fill>
             </v:background>
         <![endif]-->
-        <table class="es-wrapper" width="100%" cellspacing="0" cellpadding="0" background="https://expi-five.vercel.app/background.png" style="background-image: url('https://expi-five.vercel.app/background.png'); background-repeat: no-repeat; background-position: center top;">
- <tbody>
+        <table class="es-wrapper" width="100%" cellspacing="0" cellpadding="0">
+            <tbody>
                 <tr>
                     <td class="esd-email-paddings" valign="top">
                         <!-- Cabeçalho -->
@@ -771,7 +778,7 @@ export function Chat() {
                                                                                 <tr>
                                                                                     <td align="center" class="esd-block-text es-p40b es-p40r es-p40l es-m-p0r es-m-p0l">
                                                                                         <p><strong>Título da Conversa:</strong></p>
-                                                                                        <h2>${currentTitle}</h2> <!-- Título da conversa aumentado -->
+                                                                                        <h2 class="analysis-title">${currentTitle}</h2> <!-- Título da conversa ajustado -->
                                                                                         <p><strong>Análise da interação:</strong></p>
                                                                                         ${analysis}
                                                                                     </td>
@@ -934,6 +941,7 @@ export function Chat() {
 </body>
 
 </html>
+
 `;
 
 
