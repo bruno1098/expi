@@ -659,6 +659,13 @@ export function Chat() {
             font-family: 'Manrope', sans-serif;
             color: #ffffff !important; /* Texto sempre em branco */
         }
+            .opinion-title {
+            font-family: 'Creepster', cursive;
+            color: #ff6b6b !important;
+            font-size: 36px !important;
+            line-height: 1.2;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
         a {
             text-decoration: none;
             color: #ffffff !important; /* Links em branco */
@@ -759,11 +766,13 @@ export function Chat() {
                                                                                         <p style="font-size: 14px;">FEEDBACK DA SUA CONVERSA</p>
                                                                                     </td>
                                                                                 </tr>
-                                                                                <tr>
-                                                                                    <td align="center" class="esd-block-text es-p40b">
-                                                                                        <h1>Sua Opinião Importa para Nós</h1>
-                                                                                    </td>
-                                                                                </tr>
+                                                                                 <tr>
+        <td align="center" class="esd-block-text es-p40b">
+            <h1>
+                <span class="opinion-title">Sua Opinião Importa para Nós</span>
+            </h1>
+        </td>
+    </tr>
                                                                                 <!-- Conteúdo principal -->
                                                                                 <tr>
                                                                                     <td align="center" class="esd-block-text es-p40b es-p40r es-p40l es-m-p0r es-m-p0l">
@@ -846,49 +855,61 @@ export function Chat() {
                                                     </td>
                                                 </tr>
                                                 <!-- Rodapé -->
-                                                 <table cellpadding="0" cellspacing="0" class="es-footer es-footer-body" align="center">
-                            <tbody>
-                                <tr>
-                                    <td align="center">
-                                        <div class="footer-socials">
-                                            <a href="#" target="_blank"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/facebook-logo-white.png" class="footer-icon" alt="Facebook"></a>
-                                            <a href="#" target="_blank"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/x-logo-white.png" class="footer-icon" alt="X"></a>
-                                            <a href="#" target="_blank"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/instagram-logo-white.png" class="footer-icon" alt="Instagram"></a>
-                                            <a href="#" target="_blank"><img src="https://tlr.stripocdn.email/content/assets/img/social-icons/logo-white/youtube-logo-white.png" class="footer-icon" alt="YouTube"></a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <!-- Linha separadora -->
-                                <tr>
-                                    <td align="center" style="padding: 20px 0;">
-                                        <table border="0" width="65%" height="100%" cellpadding="0" cellspacing="0">
-                                            <tbody>
                                                 <tr>
-                                                    <td style="border-bottom: 1px solid #555; height: 1px; width: 100%;"></td>
+                                                    <td class="esd-structure es-p40t es-p40b es-p20r es-p20l" align="left" background="https://expi-five.vercel.app/background.png" style="background-image: url('https://expi-five.vercel.app/background.png'); background-repeat: no-repeat; background-position: center bottom;">
+                                                          <table cellpadding="0" cellspacing="0" width="100%">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td width="560" align="left" class="esd-container-frame">
+                                                                        <table cellpadding="0" cellspacing="0" width="100%">
+                                                                            <tbody>
+                                                                               
+                                                                                <!-- Linha separadora -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-spacer es-p20" style="font-size:0">
+                                                                                        <table border="0" width="65%" height="100%" cellpadding="0" cellspacing="0">
+                                                                                            <tbody>
+                                                                                                <tr>
+                                                                                                    <td style="border-bottom: 1px solid #ffffff; background: unset; height: 1px; width: 100%; margin: 0px;"></td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Texto de agradecimento -->
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-text es-p15t es-p40b">
+                                                                                        <p>Obrigado por usar nosso serviço!</p>
+                                                                                        <p>Este e-mail foi enviado automaticamente, por favor, não responda.</p>
+                                                                                        <p>Visite nosso site: <a href="https://plusoft-expi.vercel.app" target="_blank">https://plusoft-expi.vercel.app</a></p>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <!-- Logo adicional no rodapé, se desejar -->
+                                                                                <!--
+                                                                                <tr>
+                                                                                    <td align="center" class="esd-block-image es-infoblock made_with" style="font-size:0">
+                                                                                        <a target="_blank" href="#">
+                                                                                            <img src="https://expi-five.vercel.app/logo.png" alt="" width="125" style="display: block;">
+                                                                                        </a>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                -->
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
                                                 </tr>
+                                                <!-- Fim do Rodapé -->
                                             </tbody>
                                         </table>
                                     </td>
                                 </tr>
-                                <!-- Texto do rodapé -->
-                                <tr>
-                                    <td class="footer-text">
-                                        <p>Obrigado por usar nosso serviço!</p>
-                                        <p>Este e-mail foi enviado automaticamente, por favor, não responda.</p>
-                                        <p>Visite nosso site: <a href="https://plusoft-expi.vercel.app" target="_blank">https://plusoft-expi.vercel.app</a></p>
-                                    </td>
-                                </tr>
-                                <!-- Logo no rodapé -->
-                                <tr>
-                                    <td align="center" style="padding-top: 20px;">
-                                        <a target="_blank" href="https://plusoft-expi.vercel.app">
-                                            <img src="https://github.com/bruno1098/expi/blob/main/public/logo.png?raw=true" alt="Logo" height="60">
-                                        </a>
-                                    </td>
-                                </tr>
                             </tbody>
                         </table>
-                        <!-- Fim do Rodapé -->
+                        <!-- Fim do conteúdo principal -->
                     </td>
                 </tr>
             </tbody>
